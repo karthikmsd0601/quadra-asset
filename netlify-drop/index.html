@@ -1,0 +1,1688 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Quadra Asset Management</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --primary: #007ED5;
+      --primary-hover: #0069B4;
+      --primary-light: #EFF6FF;
+      --primary-border: #BAE6FD;
+      --bg-page: #F8FAFC;
+      --surface: #FFFFFF;
+      --surface-subtle: #F1F5F9;
+      --border: #E2E8F0;
+      --border-strong: #CBD5E1;
+      --text-main: #0F172A;
+      --text-muted: #64748B;
+      --text-subtle: #94A3B8;
+      --success-bg: #DCFCE7;
+      --success-text: #166534;
+      --warning-bg: #FEF3C7;
+      --warning-text: #92400E;
+      --danger-bg: #FEE2E2;
+      --danger-text: #991B1B;
+      --info-bg: #E0F2FE;
+      --info-text: #0369A1;
+      --radius-sm: 6px;
+      --radius-md: 10px;
+      --radius-lg: 14px;
+      --radius-full: 9999px;
+      --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+      --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.07), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+      --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.04);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg-page);
+      color: var(--text-main);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow-x: hidden;
+    }
+
+    /* Top Navigation Bar */
+    .navbar {
+      height: 64px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 32px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .nav-brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      text-decoration: none;
+    }
+
+    .brand-logo {
+      width: 36px;
+      height: 36px;
+      border-radius: var(--radius-md);
+      background: linear-gradient(135deg, #007ED5 0%, #004B87 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #FFFFFF;
+      font-weight: 700;
+      font-size: 18px;
+      box-shadow: 0 2px 8px rgba(0, 126, 213, 0.25);
+    }
+
+    .brand-title {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--text-main);
+      letter-spacing: -0.02em;
+    }
+
+    .brand-badge {
+      font-size: 11px;
+      font-weight: 600;
+      background: #E0F2FE;
+      color: #0284C7;
+      padding: 2px 8px;
+      border-radius: var(--radius-full);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    /* Role Switcher in Header */
+    .role-switcher {
+      display: flex;
+      background: var(--surface-subtle);
+      padding: 4px;
+      border-radius: var(--radius-full);
+      border: 1px solid var(--border);
+      gap: 4px;
+    }
+
+    .role-btn {
+      border: none;
+      background: transparent;
+      padding: 6px 16px;
+      border-radius: var(--radius-full);
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: all 0.15s ease;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .role-btn.active {
+      background: var(--surface);
+      color: var(--primary);
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    }
+
+    .user-profile {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .user-avatar {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: #E0E7FF;
+      color: #4338CA;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 600;
+      font-size: 14px;
+    }
+
+    .user-info {
+      text-align: right;
+    }
+
+    .user-name {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-main);
+    }
+
+    .user-email {
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    /* Sub Navigation Tabs for Manager / Admin */
+    .sub-nav {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 0 32px;
+      display: flex;
+      gap: 8px;
+    }
+
+    .sub-tab-btn {
+      border: none;
+      background: transparent;
+      padding: 14px 18px;
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--text-muted);
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      transition: all 0.15s ease;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .sub-tab-btn:hover {
+      color: var(--text-main);
+    }
+
+    .sub-tab-btn.active {
+      color: var(--primary);
+      font-weight: 600;
+      border-bottom-color: var(--primary);
+    }
+
+    /* Main Container */
+    .main-container {
+      max-width: 1380px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 32px;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+      flex: 1;
+    }
+
+    /* Section Header: strictly left-aligned with 24px SemiBold heading */
+    .section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 16px;
+      width: 100%;
+    }
+
+    .page-heading {
+      font-size: 24px;
+      font-weight: 600;
+      line-height: 32px;
+      color: var(--text-main);
+      letter-spacing: -0.02em;
+      text-align: left;
+    }
+
+    /* Standardized "New Asset Request" Button with Vector Mouse Icon */
+    .new-asset-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      background: #FFFFFF;
+      color: #1E293B;
+      border: 1px solid #E2E8F0;
+      border-radius: 9999px;
+      padding: 6px 20px 6px 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+      transition: all 0.15s ease;
+      letter-spacing: -0.01em;
+    }
+
+    .new-asset-btn:hover {
+      border-color: #CBD5E1;
+      box-shadow: 0 2px 8px rgba(0, 126, 213, 0.15);
+      transform: translateY(-1px);
+    }
+
+    .new-asset-icon-circle {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: #007ED5;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #FFFFFF;
+      flex-shrink: 0;
+    }
+
+    /* Cards & Stats */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 16px;
+      width: 100%;
+    }
+
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      box-shadow: var(--shadow-sm);
+      text-align: left;
+    }
+
+    .stat-label {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+    }
+
+    .stat-value {
+      font-size: 26px;
+      font-weight: 700;
+      color: var(--text-main);
+      letter-spacing: -0.02em;
+    }
+
+    .stat-icon-wrapper {
+      width: 44px;
+      height: 44px;
+      border-radius: var(--radius-md);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* Left-aligned Content Section Box */
+    .content-section {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      align-items: flex-start;
+      text-align: left;
+      width: 100%;
+    }
+
+    /* Asset Grid */
+    .assets-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: 20px;
+      width: 100%;
+    }
+
+    .asset-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      box-shadow: var(--shadow-sm);
+      transition: all 0.2s ease;
+      cursor: pointer;
+      position: relative;
+    }
+
+    .asset-card:hover {
+      border-color: var(--primary-border);
+      box-shadow: var(--shadow-md);
+      transform: translateY(-2px);
+    }
+
+    .asset-card-top {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .asset-icon-box {
+      width: 44px;
+      height: 44px;
+      border-radius: var(--radius-md);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .asset-badge {
+      padding: 4px 10px;
+      border-radius: var(--radius-full);
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: capitalize;
+    }
+
+    .badge-in-use { background: var(--success-bg); color: var(--success-text); }
+    .badge-pending { background: var(--warning-bg); color: var(--warning-text); }
+    .badge-repair { background: var(--danger-bg); color: var(--danger-text); }
+
+    .asset-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--text-main);
+      line-height: 1.3;
+    }
+
+    .asset-tag {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--primary);
+      margin-top: 2px;
+    }
+
+    .asset-meta-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      padding-top: 12px;
+      border-top: 1px solid var(--border);
+      font-size: 12px;
+    }
+
+    .meta-item {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .meta-item-label {
+      color: var(--text-muted);
+      font-size: 11px;
+    }
+
+    .meta-item-val {
+      font-weight: 600;
+      color: var(--text-main);
+    }
+
+    /* Tables */
+    .table-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      width: 100%;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .table-toolbar {
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .search-input-box {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--surface-subtle);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 8px 14px;
+      width: 320px;
+      max-width: 100%;
+    }
+
+    .search-input-box input {
+      border: none;
+      background: transparent;
+      outline: none;
+      font-size: 13px;
+      width: 100%;
+      color: var(--text-main);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+    }
+
+    thead th {
+      background: #F8FAFC;
+      color: var(--text-muted);
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      padding: 12px 20px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    tbody td {
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+      font-size: 13px;
+      color: var(--text-main);
+      vertical-align: middle;
+    }
+
+    tbody tr:last-child td {
+      border-bottom: none;
+    }
+
+    tbody tr:hover {
+      background: #F8FAFC;
+    }
+
+    .action-btn {
+      padding: 6px 12px;
+      border-radius: var(--radius-sm);
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      border: 1px solid transparent;
+      transition: all 0.15s ease;
+    }
+
+    .btn-approve {
+      background: #DCFCE7;
+      color: #15803D;
+      border-color: #BBF7D0;
+    }
+    .btn-approve:hover {
+      background: #BBF7D0;
+    }
+
+    .btn-reject {
+      background: #FEE2E2;
+      color: #B91C1C;
+      border-color: #FECACA;
+      margin-left: 6px;
+    }
+    .btn-reject:hover {
+      background: #FECACA;
+    }
+
+    /* Modal dialog */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.45);
+      backdrop-filter: blur(4px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      padding: 20px;
+    }
+
+    .modal-card {
+      background: var(--surface);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-lg);
+      max-width: 580px;
+      width: 100%;
+      max-height: 90vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      animation: modalFadeIn 0.2s ease-out;
+    }
+
+    @keyframes modalFadeIn {
+      from { opacity: 0; transform: scale(0.96) translateY(8px); }
+      to { opacity: 1; transform: scale(1) translateY(0); }
+    }
+
+    .modal-header {
+      padding: 20px 24px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .modal-title {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--text-main);
+    }
+
+    .modal-close {
+      border: none;
+      background: transparent;
+      font-size: 20px;
+      cursor: pointer;
+      color: var(--text-muted);
+      line-height: 1;
+    }
+
+    .modal-body {
+      padding: 24px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .preset-types-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+    }
+
+    .preset-card {
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 14px 10px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      background: var(--surface);
+      text-align: center;
+    }
+
+    .preset-card:hover, .preset-card.selected {
+      border-color: var(--primary);
+      background: var(--primary-light);
+      box-shadow: 0 0 0 2px var(--primary-border);
+    }
+
+    .preset-card-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .preset-card-name {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-main);
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      text-align: left;
+    }
+
+    .form-label {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-main);
+    }
+
+    .form-textarea {
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 10px 14px;
+      font-size: 13px;
+      outline: none;
+      resize: vertical;
+      min-height: 80px;
+      font-family: inherit;
+    }
+
+    .modal-footer {
+      padding: 16px 24px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 12px;
+      background: #F8FAFC;
+    }
+
+    .btn-secondary {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text-main);
+      padding: 8px 18px;
+      border-radius: var(--radius-md);
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .btn-primary {
+      background: var(--primary);
+      border: 1px solid transparent;
+      color: #FFFFFF;
+      padding: 8px 20px;
+      border-radius: var(--radius-md);
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      box-shadow: 0 1px 2px rgba(0, 126, 213, 0.2);
+    }
+
+    .btn-primary:hover {
+      background: var(--primary-hover);
+    }
+
+    /* Toast */
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: #1E293B;
+      color: #FFFFFF;
+      padding: 12px 20px;
+      border-radius: var(--radius-md);
+      font-size: 13px;
+      font-weight: 500;
+      box-shadow: var(--shadow-lg);
+      display: none;
+      align-items: center;
+      gap: 10px;
+      z-index: 2000;
+      animation: toastIn 0.25s ease;
+    }
+
+    @keyframes toastIn {
+      from { opacity: 0; transform: translateY(12px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Navbar -->
+  <header class="navbar">
+    <a href="#" class="nav-brand">
+      <div class="brand-logo">Q</div>
+      <span class="brand-title">Quadra Asset</span>
+      <span class="brand-badge">Enterprise</span>
+    </a>
+
+    <!-- Role Switcher -->
+    <div class="role-switcher">
+      <button class="role-btn active" id="btn-role-employee" onclick="switchRole('employee')">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+        Employee
+      </button>
+      <button class="role-btn" id="btn-role-manager" onclick="switchRole('manager')">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+        Manager
+      </button>
+      <button class="role-btn" id="btn-role-admin" onclick="switchRole('admin')">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+        Administrator
+      </button>
+    </div>
+
+    <!-- User Profile -->
+    <div class="user-profile">
+      <div class="user-info">
+        <div class="user-name">Karthik M</div>
+        <div class="user-email">karthik.m@quadrasystems.net</div>
+      </div>
+      <div class="user-avatar">KM</div>
+    </div>
+  </header>
+
+  <!-- Sub Navigation for Manager / Administrator -->
+  <nav class="sub-nav" id="manager-subnav" style="display: none;">
+    <button class="sub-tab-btn active" onclick="switchManagerTab('dashboard')">Asset Manager Dashboard</button>
+    <button class="sub-tab-btn" onclick="switchManagerTab('approvals')">Approvals</button>
+    <button class="sub-tab-btn" onclick="switchManagerTab('requests')">My Requests</button>
+  </nav>
+
+  <nav class="sub-nav" id="admin-subnav" style="display: none;">
+    <button class="sub-tab-btn active" onclick="switchAdminTab('dashboard')">Management Dashboard</button>
+    <button class="sub-tab-btn" onclick="switchAdminTab('inventory')">Asset Inventory</button>
+    <button class="sub-tab-btn" onclick="switchAdminTab('approvals')">Admin Approvals & Requests</button>
+    <button class="sub-tab-btn" onclick="switchAdminTab('employees')">Employee List</button>
+    <button class="sub-tab-btn" onclick="switchAdminTab('reports')">Asset Management Reports & Analytics</button>
+  </nav>
+
+  <!-- Main View Container -->
+  <main class="main-container">
+
+    <!-- ==================== 1. EMPLOYEE ROLE VIEW ==================== -->
+    <section id="view-employee" class="content-section">
+      <!-- Section Header with 24px SemiBold left-aligned heading & New Asset Request button -->
+      <div class="section-header">
+        <h1 class="page-heading">My Assets</h1>
+        <button class="new-asset-btn" onclick="openNewAssetModal()">
+          <div class="new-asset-icon-circle">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+          </div>
+          <span>New Asset Request</span>
+        </button>
+      </div>
+
+      <!-- Quick KPI Stats -->
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div>
+            <div class="stat-label">Assigned Assets</div>
+            <div class="stat-value">4</div>
+          </div>
+          <div class="stat-icon-wrapper" style="background: #EFF6FF; color: #2563EB;">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div>
+            <div class="stat-label">Active & Healthy</div>
+            <div class="stat-value">4</div>
+          </div>
+          <div class="stat-icon-wrapper" style="background: #DCFCE7; color: #166534;">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div>
+            <div class="stat-label">Pending Requests</div>
+            <div class="stat-value">0</div>
+          </div>
+          <div class="stat-icon-wrapper" style="background: #FEF3C7; color: #92400E;">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 14 14"></polyline></svg>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div>
+            <div class="stat-label">Total Assigned Value</div>
+            <div class="stat-value">$5,548</div>
+          </div>
+          <div class="stat-icon-wrapper" style="background: #FAF5FF; color: #9333EA;">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+          </div>
+        </div>
+      </div>
+
+      <!-- Asset Cards Grid (Left-aligned) -->
+      <div class="assets-grid">
+        <!-- Asset 1: Laptop -->
+        <div class="asset-card">
+          <div class="asset-card-top">
+            <div class="asset-icon-box" style="background: #EFF6FF; color: #2563EB;">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
+            </div>
+            <span class="asset-badge badge-in-use">In Use</span>
+          </div>
+          <div>
+            <div class="asset-title">MacBook Pro 16" M3 Max</div>
+            <div class="asset-tag">AST00001</div>
+          </div>
+          <div class="asset-meta-row">
+            <div class="meta-item">
+              <span class="meta-item-label">Category</span>
+              <span class="meta-item-val">Laptop</span>
+            </div>
+            <div class="meta-item">
+              <span class="meta-item-label">Serial Number</span>
+              <span class="meta-item-val">SN-MBP-88123</span>
+            </div>
+            <div class="meta-item">
+              <span class="meta-item-label">Location</span>
+              <span class="meta-item-val">HQ - Floor 4</span>
+            </div>
+            <div class="meta-item">
+              <span class="meta-item-label">Assigned Date</span>
+              <span class="meta-item-val">10/01/2024</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Asset 2: Mouse (Using Exact PDF Vector Mouse Icon) -->
+        <div class="asset-card">
+          <div class="asset-card-top">
+            <div class="asset-icon-box" style="background: #FDF2F8;">
+              <!-- Exact Vector Mouse Icon from PDF -->
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 21 21" width="22" height="22" fill="#BE185D">
+                <g transform="matrix(1 0 0 -1 0 21)">
+                  <g transform="translate(4.375, 0.175781)">
+                    <path d="M 6.125 19.074219 L 6.125 18.286718 C 9.07282 18.286718 11.4625 15.897038 11.4625 12.949219 L 12.25 12.949219 L 13.0375 12.949219 C 13.0375 16.766888 9.942668 19.861719 6.125 19.861719 L 6.125 19.074219 Z M 12.25 12.949219 L 11.4625 12.949219 L 11.4625 7.699219 L 12.25 7.699219 L 13.0375 7.699219 L 13.0375 12.949219 L 12.25 12.949219 Z M 12.25 7.699219 L 11.4625 7.699219 C 11.4625 4.751399 9.07282 2.361719 6.125 2.361719 L 6.125 1.574219 L 6.125 0.786718 C 9.942668 0.786718 13.0375 3.881551 13.0375 7.699219 L 12.25 7.699219 Z M 6.125 1.574219 L 6.125 2.361719 C 3.17718 2.361719 0.7875 4.751399 0.7875 7.699219 L 0 7.699219 L -0.7875 7.699219 C -0.7875 3.881551 2.307332 0.786718 6.125 0.786718 L 6.125 1.574219 Z M 0 7.699219 L 0.7875 7.699219 L 0.7875 12.949219 L 0 12.949219 L -0.7875 12.949219 L -0.7875 7.699219 L 0 7.699219 Z M 0 12.949219 L 0.7875 12.949219 C 0.7875 15.897038 3.17718 18.286718 6.125 18.286718 L 6.125 19.074219 L 6.125 19.861719 C 2.307332 19.861719 -0.7875 16.766888 -0.7875 12.949219 L 0 12.949219 Z" />
+                  </g>
+                  <g transform="translate(10.5, 10.675781)">
+                    <path d="M 0.7875 5.074219 C 0.7875 5.509143 0.434924 5.861719 0 5.861719 C -0.434924 5.861719 -0.7875 5.509143 -0.7875 5.074219 L 0 5.074219 L 0.7875 5.074219 Z M -0.7875 1.574219 C -0.7875 1.139295 -0.434924 0.786719 0 0.786719 C 0.434924 0.786719 0.7875 1.139295 0.7875 1.574219 L 0 1.574219 L -0.7875 1.574219 Z M 0 5.074219 L -0.7875 5.074219 L -0.7875 1.574219 L 0 1.574219 L 0.7875 1.574219 L 0.7875 5.074219 L 0 5.074219 Z" />
+                  </g>
+                </g>
+              </svg>
+            </div>
+            <span class="asset-badge badge-in-use">In Use</span>
+          </div>
+          <div>
+            <div class="asset-title">Logitech MX Master 3S Wireless Mouse</div>
+            <div class="asset-tag">AST00024</div>
+          </div>
+          <div class="asset-meta-row">
+            <div class="meta-item">
+              <span class="meta-item-label">Category</span>
+              <span class="meta-item-val">Mouse</span>
+            </div>
+            <div class="meta-item">
+              <span class="meta-item-label">Serial Number</span>
+              <span class="meta-item-val">SN-MOU-99014</span>
+            </div>
+            <div class="meta-item">
+              <span class="meta-item-label">Location</span>
+              <span class="meta-item-val">HQ - Floor 4</span>
+            </div>
+            <div class="meta-item">
+              <span class="meta-item-label">Assigned Date</span>
+              <span class="meta-item-val">15/01/2024</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Asset 3: Monitor -->
+        <div class="asset-card">
+          <div class="asset-card-top">
+            <div class="asset-icon-box" style="background: #ECFDF5; color: #10B981;">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
+            </div>
+            <span class="asset-badge badge-in-use">In Use</span>
+          </div>
+          <div>
+            <div class="asset-title">Apple Studio Display 27" 5K</div>
+            <div class="asset-tag">AST00008</div>
+          </div>
+          <div class="asset-meta-row">
+            <div class="meta-item">
+              <span class="meta-item-label">Category</span>
+              <span class="meta-item-val">Monitor</span>
+            </div>
+            <div class="meta-item">
+              <span class="meta-item-label">Serial Number</span>
+              <span class="meta-item-val">SN-SD-55210</span>
+            </div>
+            <div class="meta-item">
+              <span class="meta-item-label">Location</span>
+              <span class="meta-item-val">HQ - Floor 4</span>
+            </div>
+            <div class="meta-item">
+              <span class="meta-item-label">Assigned Date</span>
+              <span class="meta-item-val">12/01/2024</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Asset 4: Keyboard -->
+        <div class="asset-card">
+          <div class="asset-card-top">
+            <div class="asset-icon-box" style="background: #FDF2F8; color: #DB2777;">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"></rect><path d="M6 8h.001M10 8h.001M14 8h.001M18 8h.001M6 12h.001M10 12h.001M14 12h.001M18 12h.001M8 16h8"></path></svg>
+            </div>
+            <span class="asset-badge badge-in-use">In Use</span>
+          </div>
+          <div>
+            <div class="asset-title">Apple Magic Keyboard with Touch ID</div>
+            <div class="asset-tag">AST00031</div>
+          </div>
+          <div class="asset-meta-row">
+            <div class="meta-item">
+              <span class="meta-item-label">Category</span>
+              <span class="meta-item-val">Keyboard</span>
+            </div>
+            <div class="meta-item">
+              <span class="meta-item-label">Serial Number</span>
+              <span class="meta-item-val">SN-KB-10293</span>
+            </div>
+            <div class="meta-item">
+              <span class="meta-item-label">Location</span>
+              <span class="meta-item-val">HQ - Floor 4</span>
+            </div>
+            <div class="meta-item">
+              <span class="meta-item-label">Assigned Date</span>
+              <span class="meta-item-val">15/01/2024</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== 2. MANAGER ROLE VIEW ==================== -->
+    <section id="view-manager" class="content-section" style="display: none;">
+      
+      <!-- Sub-view 1: Manager Dashboard (Left-aligned, 24px heading) -->
+      <div id="mgr-subview-dashboard" class="content-section">
+        <div class="section-header">
+          <h1 class="page-heading">Asset Manager Dashboard</h1>
+          <button class="new-asset-btn" onclick="openNewAssetModal()">
+            <div class="new-asset-icon-circle">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+            </div>
+            <span>New Asset Request</span>
+          </button>
+        </div>
+
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div>
+              <div class="stat-label">Team Managed Assets</div>
+              <div class="stat-value">18</div>
+            </div>
+            <div class="stat-icon-wrapper" style="background: #EFF6FF; color: #2563EB;">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle></svg>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div>
+              <div class="stat-label">Pending Team Approvals</div>
+              <div class="stat-value">3</div>
+            </div>
+            <div class="stat-icon-wrapper" style="background: #FEF3C7; color: #92400E;">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 14 14"></polyline></svg>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div>
+              <div class="stat-label">My Own Requests</div>
+              <div class="stat-value">2</div>
+            </div>
+            <div class="stat-icon-wrapper" style="background: #F0FDF4; color: #16A34A;">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+            </div>
+          </div>
+        </div>
+
+        <!-- Team Members Assets Table -->
+        <div class="table-card">
+          <div class="table-toolbar">
+            <span style="font-weight: 600; font-size: 15px;">Direct Reports & Assigned Assets</span>
+            <div class="search-input-box">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#64748B" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+              <input type="text" placeholder="Search team member or asset..." id="mgr-team-search" oninput="filterTable('mgr-team-table', this.value)">
+            </div>
+          </div>
+          <table id="mgr-team-table">
+            <thead>
+              <tr>
+                <th>Team Member</th>
+                <th>Department</th>
+                <th>Asset Name & Tag</th>
+                <th>Category</th>
+                <th>Status</th>
+                <th>Handover Date</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td style="font-weight: 600;">Alex Johnson</td>
+                <td>Software Engineering</td>
+                <td>Dell XPS 15 (AST00104)</td>
+                <td>Laptop</td>
+                <td><span class="asset-badge badge-in-use">In Use</span></td>
+                <td>14/02/2024</td>
+              </tr>
+              <tr>
+                <td style="font-weight: 600;">Priya Sharma</td>
+                <td>Product Design</td>
+                <td>Logitech MX Master 3S (AST00112)</td>
+                <td>
+                  <span style="display: inline-flex; align-items: center; gap: 6px;">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 21 21" width="16" height="16" fill="#BE185D">
+                      <g transform="matrix(1 0 0 -1 0 21)"><g transform="translate(4.375, 0.175781)"><path d="M 6.125 19.074219 L 6.125 18.286718 C 9.07282 18.286718 11.4625 15.897038 11.4625 12.949219 L 12.25 12.949219 L 13.0375 12.949219 C 13.0375 16.766888 9.942668 19.861719 6.125 19.861719 L 6.125 19.074219 Z M 12.25 12.949219 L 11.4625 12.949219 L 11.4625 7.699219 L 12.25 7.699219 L 13.0375 7.699219 L 13.0375 12.949219 L 12.25 12.949219 Z M 12.25 7.699219 L 11.4625 7.699219 C 11.4625 4.751399 9.07282 2.361719 6.125 2.361719 L 6.125 1.574219 L 6.125 0.786718 C 9.942668 0.786718 13.0375 3.881551 13.0375 7.699219 L 12.25 7.699219 Z M 6.125 1.574219 L 6.125 2.361719 C 3.17718 2.361719 0.7875 4.751399 0.7875 7.699219 L 0 7.699219 L -0.7875 7.699219 C -0.7875 3.881551 2.307332 0.786718 6.125 0.786718 L 6.125 1.574219 Z M 0 7.699219 L 0.7875 7.699219 L 0.7875 12.949219 L 0 12.949219 L -0.7875 12.949219 L -0.7875 7.699219 L 0 7.699219 Z M 0 12.949219 L 0.7875 12.949219 C 0.7875 15.897038 3.17718 18.286718 6.125 18.286718 L 6.125 19.074219 L 6.125 19.861719 C 2.307332 19.861719 -0.7875 16.766888 -0.7875 12.949219 L 0 12.949219 Z" /></g></g>
+                    </svg>
+                    Mouse
+                  </span>
+                </td>
+                <td><span class="asset-badge badge-in-use">In Use</span></td>
+                <td>20/02/2024</td>
+              </tr>
+              <tr>
+                <td style="font-weight: 600;">David Miller</td>
+                <td>QA Engineering</td>
+                <td>LG 32" Curved 4K (AST00089)</td>
+                <td>Monitor</td>
+                <td><span class="asset-badge badge-in-use">In Use</span></td>
+                <td>05/03/2024</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Sub-view 2: Approvals (Left-aligned, 24px heading) -->
+      <div id="mgr-subview-approvals" class="content-section" style="display: none;">
+        <div class="section-header">
+          <h1 class="page-heading">Approvals</h1>
+        </div>
+
+        <div class="table-card">
+          <div class="table-toolbar">
+            <span style="font-weight: 600; font-size: 15px;">Pending Direct Report Requests</span>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>Request ID</th>
+                <th>Requester</th>
+                <th>Asset Category</th>
+                <th>Justification</th>
+                <th>Requested Date</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td style="font-weight: 600; color: var(--primary);">REQ-2026-081</td>
+                <td>Priya Sharma</td>
+                <td>
+                  <span style="display: inline-flex; align-items: center; gap: 6px;">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 21 21" width="16" height="16" fill="#BE185D">
+                      <g transform="matrix(1 0 0 -1 0 21)"><g transform="translate(4.375, 0.175781)"><path d="M 6.125 19.074219 L 6.125 18.286718 C 9.07282 18.286718 11.4625 15.897038 11.4625 12.949219 L 12.25 12.949219 L 13.0375 12.949219 C 13.0375 16.766888 9.942668 19.861719 6.125 19.861719 L 6.125 19.074219 Z M 12.25 12.949219 L 11.4625 12.949219 L 11.4625 7.699219 L 12.25 7.699219 L 13.0375 7.699219 L 13.0375 12.949219 L 12.25 12.949219 Z M 12.25 7.699219 L 11.4625 7.699219 C 11.4625 4.751399 9.07282 2.361719 6.125 2.361719 L 6.125 1.574219 L 6.125 0.786718 C 9.942668 0.786718 13.0375 3.881551 13.0375 7.699219 L 12.25 7.699219 Z M 6.125 1.574219 L 6.125 2.361719 C 3.17718 2.361719 0.7875 4.751399 0.7875 7.699219 L 0 7.699219 L -0.7875 7.699219 C -0.7875 3.881551 2.307332 0.786718 6.125 0.786718 L 6.125 1.574219 Z M 0 7.699219 L 0.7875 7.699219 L 0.7875 12.949219 L 0 12.949219 L -0.7875 12.949219 L -0.7875 7.699219 L 0 7.699219 Z M 0 12.949219 L 0.7875 12.949219 C 0.7875 15.897038 3.17718 18.286718 6.125 18.286718 L 6.125 19.074219 L 6.125 19.861719 C 2.307332 19.861719 -0.7875 16.766888 -0.7875 12.949219 L 0 12.949219 Z" /></g></g>
+                    </svg>
+                    Ergonomic Mouse
+                  </span>
+                </td>
+                <td>Need precision ergonomic mouse for high resolution Figma designs</td>
+                <td>20/10/2026</td>
+                <td><span class="asset-badge badge-pending">Pending Manager</span></td>
+                <td>
+                  <button class="action-btn btn-approve" onclick="showToast('Request REQ-2026-081 approved successfully!')">Approve</button>
+                  <button class="action-btn btn-reject" onclick="showToast('Request REQ-2026-081 rejected.')">Reject</button>
+                </td>
+              </tr>
+              <tr>
+                <td style="font-weight: 600; color: var(--primary);">REQ-2026-079</td>
+                <td>David Miller</td>
+                <td>Monitor (4K 32")</td>
+                <td>Secondary display needed for performance profiling dashboards</td>
+                <td>19/10/2026</td>
+                <td><span class="asset-badge badge-pending">Pending Manager</span></td>
+                <td>
+                  <button class="action-btn btn-approve" onclick="showToast('Request REQ-2026-079 approved successfully!')">Approve</button>
+                  <button class="action-btn btn-reject" onclick="showToast('Request REQ-2026-079 rejected.')">Reject</button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Sub-view 3: My Requests (Left-aligned, 24px heading) -->
+      <div id="mgr-subview-requests" class="content-section" style="display: none;">
+        <div class="section-header">
+          <h1 class="page-heading">My Requests</h1>
+          <button class="new-asset-btn" onclick="openNewAssetModal()">
+            <div class="new-asset-icon-circle">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+            </div>
+            <span>New Asset Request</span>
+          </button>
+        </div>
+
+        <div class="table-card">
+          <div class="table-toolbar">
+            <span style="font-weight: 600; font-size: 15px;">Requests Submitted by Me</span>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>Request ID</th>
+                <th>Asset Type</th>
+                <th>Justification</th>
+                <th>Submitted Date</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td style="font-weight: 600; color: var(--primary);">REQ-2026-050</td>
+                <td>MacBook Pro 16" M3 Max</td>
+                <td>Quarterly workstation upgrade for engineering management duties</td>
+                <td>01/09/2026</td>
+                <td><span class="asset-badge badge-in-use">Fulfilled</span></td>
+              </tr>
+              <tr>
+                <td style="font-weight: 600; color: var(--primary);">REQ-2026-062</td>
+                <td>AirPods Max Wireless Headset</td>
+                <td>Client conferencing and noise suppression during executive summits</td>
+                <td>15/09/2026</td>
+                <td><span class="asset-badge badge-in-use">Fulfilled</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- ==================== 3. ADMINISTRATOR ROLE VIEW ==================== -->
+    <section id="view-admin" class="content-section" style="display: none;">
+
+      <!-- Admin Sub-view 1: Management Dashboard -->
+      <div id="admin-subview-dashboard" class="content-section">
+        <div class="section-header">
+          <h1 class="page-heading">Management Dashboard</h1>
+        </div>
+
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div>
+              <div class="stat-label">Total Organization Assets</div>
+              <div class="stat-value">342</div>
+            </div>
+            <div class="stat-icon-wrapper" style="background: #EFF6FF; color: #2563EB;">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path></svg>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div>
+              <div class="stat-label">Active Assignments</div>
+              <div class="stat-value">298</div>
+            </div>
+            <div class="stat-icon-wrapper" style="background: #DCFCE7; color: #166534;">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle></svg>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div>
+              <div class="stat-label">Inventory In Stock</div>
+              <div class="stat-value">34</div>
+            </div>
+            <div class="stat-icon-wrapper" style="background: #E0F2FE; color: #0284C7;">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path></svg>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div>
+              <div class="stat-label">Pending Approval Queue</div>
+              <div class="stat-value">10</div>
+            </div>
+            <div class="stat-icon-wrapper" style="background: #FEF3C7; color: #92400E;">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 14 14"></polyline></svg>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Admin Sub-view 2: Asset Inventory -->
+      <div id="admin-subview-inventory" class="content-section" style="display: none;">
+        <div class="section-header">
+          <h1 class="page-heading">Asset Inventory</h1>
+          <button class="new-asset-btn" onclick="openNewAssetModal()">
+            <div class="new-asset-icon-circle">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+            </div>
+            <span>New Asset Request</span>
+          </button>
+        </div>
+
+        <div class="table-card">
+          <div class="table-toolbar">
+            <span style="font-weight: 600; font-size: 15px;">Hardware & Peripheral Inventory</span>
+            <div class="search-input-box">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#64748B" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+              <input type="text" placeholder="Search inventory by tag or model..." oninput="filterTable('admin-inventory-table', this.value)">
+            </div>
+          </div>
+          <table id="admin-inventory-table">
+            <thead>
+              <tr>
+                <th>Tag ID</th>
+                <th>Asset Name</th>
+                <th>Category</th>
+                <th>Serial Number</th>
+                <th>Assigned User</th>
+                <th>Location</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td style="font-weight: 600; color: var(--primary);">AST00001</td>
+                <td>MacBook Pro 16" M3 Max</td>
+                <td>Laptop</td>
+                <td>SN-MBP-88123</td>
+                <td>Karthik M</td>
+                <td>HQ - Floor 4</td>
+                <td><span class="asset-badge badge-in-use">In Use</span></td>
+              </tr>
+              <tr>
+                <td style="font-weight: 600; color: var(--primary);">AST00024</td>
+                <td>Logitech MX Master 3S</td>
+                <td>
+                  <span style="display: inline-flex; align-items: center; gap: 6px;">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 21 21" width="16" height="16" fill="#BE185D">
+                      <g transform="matrix(1 0 0 -1 0 21)"><g transform="translate(4.375, 0.175781)"><path d="M 6.125 19.074219 L 6.125 18.286718 C 9.07282 18.286718 11.4625 15.897038 11.4625 12.949219 L 12.25 12.949219 L 13.0375 12.949219 C 13.0375 16.766888 9.942668 19.861719 6.125 19.861719 L 6.125 19.074219 Z M 12.25 12.949219 L 11.4625 12.949219 L 11.4625 7.699219 L 12.25 7.699219 L 13.0375 7.699219 L 13.0375 12.949219 L 12.25 12.949219 Z M 12.25 7.699219 L 11.4625 7.699219 C 11.4625 4.751399 9.07282 2.361719 6.125 2.361719 L 6.125 1.574219 L 6.125 0.786718 C 9.942668 0.786718 13.0375 3.881551 13.0375 7.699219 L 12.25 7.699219 Z M 6.125 1.574219 L 6.125 2.361719 C 3.17718 2.361719 0.7875 4.751399 0.7875 7.699219 L 0 7.699219 L -0.7875 7.699219 C -0.7875 3.881551 2.307332 0.786718 6.125 0.786718 L 6.125 1.574219 Z M 0 7.699219 L 0.7875 7.699219 L 0.7875 12.949219 L 0 12.949219 L -0.7875 12.949219 L -0.7875 7.699219 L 0 7.699219 Z M 0 12.949219 L 0.7875 12.949219 C 0.7875 15.897038 3.17718 18.286718 6.125 18.286718 L 6.125 19.074219 L 6.125 19.861719 C 2.307332 19.861719 -0.7875 16.766888 -0.7875 12.949219 L 0 12.949219 Z" /></g></g>
+                    </svg>
+                    Mouse
+                  </span>
+                </td>
+                <td>SN-MOU-99014</td>
+                <td>Karthik M</td>
+                <td>HQ - Floor 4</td>
+                <td><span class="asset-badge badge-in-use">In Use</span></td>
+              </tr>
+              <tr>
+                <td style="font-weight: 600; color: var(--primary);">AST00088</td>
+                <td>Lenovo ThinkPad P1 Gen 6</td>
+                <td>Laptop</td>
+                <td>SN-TP-33491</td>
+                <td>Unassigned</td>
+                <td>Central IT Storage</td>
+                <td><span class="asset-badge" style="background: #E0F2FE; color: #0369A1;">In Stock</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Admin Sub-view 3: Admin Approvals & Requests -->
+      <div id="admin-subview-approvals" class="content-section" style="display: none;">
+        <div class="section-header">
+          <h1 class="page-heading">Admin Approvals & Requests</h1>
+        </div>
+
+        <div class="table-card">
+          <div class="table-toolbar">
+            <span style="font-weight: 600; font-size: 15px;">Enterprise Procurement & Replacement Requests</span>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>Req ID</th>
+                <th>Employee</th>
+                <th>Department</th>
+                <th>Requested Item</th>
+                <th>Manager Approved</th>
+                <th>Admin Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td style="font-weight: 600; color: var(--primary);">REQ-2026-081</td>
+                <td>Priya Sharma</td>
+                <td>Product Design</td>
+                <td>Ergonomic Mouse</td>
+                <td><span style="color: #16A34A; font-weight: 600;">✓ Approved</span></td>
+                <td>
+                  <button class="action-btn btn-approve" onclick="showToast('Assigned asset from inventory to Priya Sharma!')">Assign Asset</button>
+                  <button class="action-btn" style="background: #EFF6FF; color: #1D4ED8;" onclick="showToast('Order dispatched to procurement team!')">Procure New</button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Admin Sub-view 4: Employee List -->
+      <div id="admin-subview-employees" class="content-section" style="display: none;">
+        <div class="section-header">
+          <h1 class="page-heading">Employee List</h1>
+        </div>
+
+        <div class="table-card">
+          <div class="table-toolbar">
+            <span style="font-weight: 600; font-size: 15px;">Corporate Personnel & Asset Allocation</span>
+            <div class="search-input-box">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#64748B" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+              <input type="text" placeholder="Search employees..." oninput="filterTable('admin-employees-table', this.value)">
+            </div>
+          </div>
+          <table id="admin-employees-table">
+            <thead>
+              <tr>
+                <th>Employee Name</th>
+                <th>Email</th>
+                <th>Department</th>
+                <th>Branch</th>
+                <th>Assigned Assets</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td style="font-weight: 600;">Karthik M</td>
+                <td>karthik.m@quadrasystems.net</td>
+                <td>Executive Management</td>
+                <td>Headquarters</td>
+                <td>4 Assets</td>
+                <td><span class="asset-badge badge-in-use">Active</span></td>
+              </tr>
+              <tr>
+                <td style="font-weight: 600;">Alex Johnson</td>
+                <td>alex.j@quadrasystems.net</td>
+                <td>Software Engineering</td>
+                <td>Tech Center East</td>
+                <td>2 Assets</td>
+                <td><span class="asset-badge badge-in-use">Active</span></td>
+              </tr>
+              <tr>
+                <td style="font-weight: 600;">Priya Sharma</td>
+                <td>priya.s@quadrasystems.net</td>
+                <td>Product Design</td>
+                <td>Headquarters</td>
+                <td>3 Assets</td>
+                <td><span class="asset-badge badge-in-use">Active</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Admin Sub-view 5: Asset Reports (Fixing Report Output Display) -->
+      <div id="admin-subview-reports" class="content-section" style="display: none;">
+        <div class="section-header">
+          <h1 class="page-heading">Asset Management Reports & Analytics</h1>
+        </div>
+
+        <!-- Metric KPI Cards for Analytics -->
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div>
+              <div class="stat-label">Total Capitalized Asset Value</div>
+              <div class="stat-value">$248,500</div>
+            </div>
+            <div class="stat-icon-wrapper" style="background: #EFF6FF; color: #2563EB;">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div>
+              <div class="stat-label">Total Managed Inventory</div>
+              <div class="stat-value">142 Items</div>
+            </div>
+            <div class="stat-icon-wrapper" style="background: #F0FDF4; color: #16A34A;">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path></svg>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div>
+              <div class="stat-label">Active Deployments</div>
+              <div class="stat-value">118 Assets</div>
+            </div>
+            <div class="stat-icon-wrapper" style="background: #FAF5FF; color: #9333EA;">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div>
+              <div class="stat-label">In Maintenance / Spare</div>
+              <div class="stat-value">24 Items</div>
+            </div>
+            <div class="stat-icon-wrapper" style="background: #FEF3C7; color: #92400E;">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path></svg>
+            </div>
+          </div>
+        </div>
+
+        <!-- Analytical Breakdown Table -->
+        <div class="table-card">
+          <div class="table-toolbar">
+            <span style="font-weight: 600; font-size: 15px;">Department Asset Allocation & Depreciation Analytics</span>
+            <div class="search-input-box">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#64748B" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+              <input type="text" placeholder="Filter by department..." oninput="filterTable('admin-reports-table', this.value)">
+            </div>
+          </div>
+          <table id="admin-reports-table">
+            <thead>
+              <tr>
+                <th>Department</th>
+                <th>Total Assets</th>
+                <th>Total Valuation</th>
+                <th>Laptops</th>
+                <th>Monitors</th>
+                <th>Peripherals (Mice/Keyboards)</th>
+                <th>Utilization Rate</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td style="font-weight: 600;">Software Engineering</td>
+                <td>64 Items</td>
+                <td>$118,400</td>
+                <td>42</td>
+                <td>38</td>
+                <td>54</td>
+                <td><span class="asset-badge badge-in-use">96% Active</span></td>
+              </tr>
+              <tr>
+                <td style="font-weight: 600;">Product Design & UX</td>
+                <td>28 Items</td>
+                <td>$54,200</td>
+                <td>18</td>
+                <td>22</td>
+                <td>26</td>
+                <td><span class="asset-badge badge-in-use">92% Active</span></td>
+              </tr>
+              <tr>
+                <td style="font-weight: 600;">Operations & Finance</td>
+                <td>32 Items</td>
+                <td>$48,900</td>
+                <td>24</td>
+                <td>20</td>
+                <td>24</td>
+                <td><span class="asset-badge badge-in-use">88% Active</span></td>
+              </tr>
+              <tr>
+                <td style="font-weight: 600;">Human Resources</td>
+                <td>18 Items</td>
+                <td>$27,000</td>
+                <td>14</td>
+                <td>12</td>
+                <td>16</td>
+                <td><span class="asset-badge badge-in-use">90% Active</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- Modal: New Asset Request Dialog -->
+  <div class="modal-overlay" id="modal-new-asset" onclick="if(event.target === this) closeNewAssetModal()">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2 class="modal-title">New Asset Request</h2>
+        <button class="modal-close" onclick="closeNewAssetModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label">Select Asset Category</label>
+          <div class="preset-types-grid">
+            <!-- Laptop -->
+            <div class="preset-card selected" onclick="selectCategory(this, 'Laptop')">
+              <div class="preset-card-icon" style="background: #EFF6FF; color: #2563EB;">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
+              </div>
+              <span class="preset-card-name">Laptop</span>
+            </div>
+
+            <!-- Monitor -->
+            <div class="preset-card" onclick="selectCategory(this, 'Monitor')">
+              <div class="preset-card-icon" style="background: #ECFDF5; color: #10B981;">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
+              </div>
+              <span class="preset-card-name">Monitor</span>
+            </div>
+
+            <!-- Exact Mouse Icon -->
+            <div class="preset-card" onclick="selectCategory(this, 'Mouse')">
+              <div class="preset-card-icon" style="background: #FDF2F8;">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 21 21" width="20" height="20" fill="#BE185D">
+                  <g transform="matrix(1 0 0 -1 0 21)">
+                    <g transform="translate(4.375, 0.175781)">
+                      <path d="M 6.125 19.074219 L 6.125 18.286718 C 9.07282 18.286718 11.4625 15.897038 11.4625 12.949219 L 12.25 12.949219 L 13.0375 12.949219 C 13.0375 16.766888 9.942668 19.861719 6.125 19.861719 L 6.125 19.074219 Z M 12.25 12.949219 L 11.4625 12.949219 L 11.4625 7.699219 L 12.25 7.699219 L 13.0375 7.699219 L 13.0375 12.949219 L 12.25 12.949219 Z M 12.25 7.699219 L 11.4625 7.699219 C 11.4625 4.751399 9.07282 2.361719 6.125 2.361719 L 6.125 1.574219 L 6.125 0.786718 C 9.942668 0.786718 13.0375 3.881551 13.0375 7.699219 L 12.25 7.699219 Z M 6.125 1.574219 L 6.125 2.361719 C 3.17718 2.361719 0.7875 4.751399 0.7875 7.699219 L 0 7.699219 L -0.7875 7.699219 C -0.7875 3.881551 2.307332 0.786718 6.125 0.786718 L 6.125 1.574219 Z M 0 7.699219 L 0.7875 7.699219 L 0.7875 12.949219 L 0 12.949219 L -0.7875 12.949219 L -0.7875 7.699219 L 0 7.699219 Z M 0 12.949219 L 0.7875 12.949219 C 0.7875 15.897038 3.17718 18.286718 6.125 18.286718 L 6.125 19.074219 L 6.125 19.861719 C 2.307332 19.861719 -0.7875 16.766888 -0.7875 12.949219 L 0 12.949219 Z" />
+                    </g>
+                    <g transform="translate(10.5, 10.675781)">
+                      <path d="M 0.7875 5.074219 C 0.7875 5.509143 0.434924 5.861719 0 5.861719 C -0.434924 5.861719 -0.7875 5.509143 -0.7875 5.074219 L 0 5.074219 L 0.7875 5.074219 Z M -0.7875 1.574219 C -0.7875 1.139295 -0.434924 0.786719 0 0.786719 C 0.434924 0.786719 0.7875 1.139295 0.7875 1.574219 L 0 1.574219 L -0.7875 1.574219 Z M 0 5.074219 L -0.7875 5.074219 L -0.7875 1.574219 L 0 1.574219 L 0.7875 1.574219 L 0.7875 5.074219 L 0 5.074219 Z" />
+                    </g>
+                  </g>
+                </svg>
+              </div>
+              <span class="preset-card-name">Mouse</span>
+            </div>
+
+            <!-- Keyboard -->
+            <div class="preset-card" onclick="selectCategory(this, 'Keyboard')">
+              <div class="preset-card-icon" style="background: #FDF2F8; color: #DB2777;">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"></rect><path d="M6 8h.001M10 8h.001M14 8h.001M18 8h.001M6 12h.001M10 12h.001M14 12h.001M18 12h.001M8 16h8"></path></svg>
+              </div>
+              <span class="preset-card-name">Keyboard</span>
+            </div>
+
+            <!-- Mobile Phone -->
+            <div class="preset-card" onclick="selectCategory(this, 'Mobile Phone')">
+              <div class="preset-card-icon" style="background: #FAF5FF; color: #9333EA;">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg>
+              </div>
+              <span class="preset-card-name">Mobile Phone</span>
+            </div>
+
+            <!-- Others -->
+            <div class="preset-card" onclick="selectCategory(this, 'Others')">
+              <div class="preset-card-icon" style="background: #F0FDF4; color: #16A34A;">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+              </div>
+              <span class="preset-card-name">Others</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Business Justification</label>
+          <textarea class="form-textarea" id="request-justification" placeholder="State reasons for this asset requisition..."></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" onclick="closeNewAssetModal()">Cancel</button>
+        <button class="btn-primary" onclick="submitNewRequest()">Submit Request</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Notification Toast -->
+  <div class="toast" id="toast-notification">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#22C55E" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+    <span id="toast-message">Notification message</span>
+  </div>
+
+  <script>
+    let currentRole = 'employee';
+    let selectedCategoryName = 'Laptop';
+
+    function switchRole(role) {
+      currentRole = role;
+      document.querySelectorAll('.role-btn').forEach(b => b.classList.remove('active'));
+      document.getElementById('btn-role-' + role).classList.add('active');
+
+      document.getElementById('view-employee').style.display = 'none';
+      document.getElementById('view-manager').style.display = 'none';
+      document.getElementById('view-admin').style.display = 'none';
+      document.getElementById('manager-subnav').style.display = 'none';
+      document.getElementById('admin-subnav').style.display = 'none';
+
+      if (role === 'employee') {
+        document.getElementById('view-employee').style.display = 'flex';
+      } else if (role === 'manager') {
+        document.getElementById('view-manager').style.display = 'flex';
+        document.getElementById('manager-subnav').style.display = 'flex';
+        switchManagerTab('dashboard');
+      } else if (role === 'admin') {
+        document.getElementById('view-admin').style.display = 'flex';
+        document.getElementById('admin-subnav').style.display = 'flex';
+        switchAdminTab('dashboard');
+      }
+    }
+
+    function switchManagerTab(tab) {
+      document.querySelectorAll('#manager-subnav .sub-tab-btn').forEach(b => b.classList.remove('active'));
+      const tabs = ['dashboard', 'approvals', 'requests'];
+      const index = tabs.indexOf(tab);
+      if (index >= 0) {
+        document.querySelectorAll('#manager-subnav .sub-tab-btn')[index].classList.add('active');
+      }
+
+      document.getElementById('mgr-subview-dashboard').style.display = tab === 'dashboard' ? 'flex' : 'none';
+      document.getElementById('mgr-subview-approvals').style.display = tab === 'approvals' ? 'flex' : 'none';
+      document.getElementById('mgr-subview-requests').style.display = tab === 'requests' ? 'flex' : 'none';
+    }
+
+    function switchAdminTab(tab) {
+      document.querySelectorAll('#admin-subnav .sub-tab-btn').forEach(b => b.classList.remove('active'));
+      const tabs = ['dashboard', 'inventory', 'approvals', 'employees', 'reports'];
+      const index = tabs.indexOf(tab);
+      if (index >= 0) {
+        document.querySelectorAll('#admin-subnav .sub-tab-btn')[index].classList.add('active');
+      }
+
+      document.getElementById('admin-subview-dashboard').style.display = tab === 'dashboard' ? 'flex' : 'none';
+      document.getElementById('admin-subview-inventory').style.display = tab === 'inventory' ? 'flex' : 'none';
+      document.getElementById('admin-subview-approvals').style.display = tab === 'approvals' ? 'flex' : 'none';
+      document.getElementById('admin-subview-employees').style.display = tab === 'employees' ? 'flex' : 'none';
+      document.getElementById('admin-subview-reports').style.display = tab === 'reports' ? 'flex' : 'none';
+    }
+
+    function openNewAssetModal() {
+      document.getElementById('modal-new-asset').style.display = 'flex';
+    }
+
+    function closeNewAssetModal() {
+      document.getElementById('modal-new-asset').style.display = 'none';
+    }
+
+    function selectCategory(el, catName) {
+      document.querySelectorAll('.preset-card').forEach(c => c.classList.remove('selected'));
+      el.classList.add('selected');
+      selectedCategoryName = catName;
+    }
+
+    function submitNewRequest() {
+      const justification = document.getElementById('request-justification').value.trim();
+      closeNewAssetModal();
+      document.getElementById('request-justification').value = '';
+      showToast(`Requisition for ${selectedCategoryName} submitted for manager review!`);
+    }
+
+    function showToast(message) {
+      const toast = document.getElementById('toast-notification');
+      document.getElementById('toast-message').innerText = message;
+      toast.style.display = 'flex';
+      setTimeout(() => {
+        toast.style.display = 'none';
+      }, 3500);
+    }
+
+    function filterTable(tableId, query) {
+      const table = document.getElementById(tableId);
+      if (!table) return;
+      const rows = table.getElementsByTagName('tbody')[0].getElementsByTagName('tr');
+      const q = query.toLowerCase();
+      for (let r of rows) {
+        r.style.display = r.innerText.toLowerCase().includes(q) ? '' : 'none';
+      }
+    }
+  </script>
+</body>
+</html>

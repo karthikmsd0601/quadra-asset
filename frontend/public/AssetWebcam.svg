@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24">
+  <!-- Outer stand and camera housing -->
+  <path fill="#A16207" fill-rule="evenodd" d="M12 2a8 8 0 0 0-8 8c0 3.87 2.76 7.1 6.45 7.84V20H3a1 1 0 1 0 0 2h18a1 1 0 1 0 0-2h-7.45v-2.16C17.24 17.1 20 13.87 20 10a8 8 0 0 0-8-8zm0 2.5a5.5 5.5 0 1 1 0 11 5.5 5.5 0 0 1 0-11z" />
+  <!-- Inner soft circle background -->
+  <circle cx="12" cy="10" r="5.5" fill="#E8DEC8" />
+  <!-- Lens circle -->
+  <circle cx="12" cy="10" r="3.2" fill="#A16207" />
+  <!-- Center aperture -->
+  <circle cx="12" cy="10" r="1.5" fill="#FFFFFF" />
+</svg>
