@@ -151,7 +151,7 @@ export const AssetStatsCards = ({
           <div>
             <div style={{ fontSize: 13, color: "#64748B", fontWeight: 500 }}>Assigned</div>
             <div style={{ fontSize: 24, fontWeight: 700, color: "#0F172A", marginTop: 1, letterSpacing: "-0.02em" }}>
-              {stats?.AssignedCount || 1234}
+              {stats?.AssignedCount ?? 0}
             </div>
           </div>
         </div>
@@ -192,7 +192,7 @@ export const AssetStatsCards = ({
           <div>
             <div style={{ fontSize: 13, color: "#64748B", fontWeight: 500 }}>Under Maintenance</div>
             <div style={{ fontSize: 24, fontWeight: 700, color: "#0F172A", marginTop: 1, letterSpacing: "-0.02em" }}>
-              {stats?.UnderMaintenanceCount || 54}
+              {stats?.UnderMaintenanceCount ?? 0}
             </div>
           </div>
         </div>
@@ -233,7 +233,7 @@ export const AssetStatsCards = ({
           <div>
             <div style={{ fontSize: 13, color: "#64748B", fontWeight: 500 }}>In Stock</div>
             <div style={{ fontSize: 24, fontWeight: 700, color: "#0F172A", marginTop: 1, letterSpacing: "-0.02em" }}>
-              {stats?.InStockCount || 451}
+              {stats?.InStockCount ?? 0}
             </div>
           </div>
         </div>
@@ -274,7 +274,7 @@ export const AssetStatsCards = ({
           <div>
             <div style={{ fontSize: 13, color: "#64748B", fontWeight: 500 }}>End of use</div>
             <div style={{ fontSize: 24, fontWeight: 700, color: "#0F172A", marginTop: 1, letterSpacing: "-0.02em" }}>
-              {stats?.EndOfUseCount || 1234}
+              {stats?.EndOfUseCount ?? 0}
             </div>
           </div>
         </div>

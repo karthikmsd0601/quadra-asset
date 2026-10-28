@@ -1,5 +1,6 @@
 import axios, { AxiosError } from "axios";
 import { getStoredAuthToken } from "../../Auth/tokenStorage";
+import type { AssetInventoryRecord } from "./AssetInventoryService";
 
 const API_BASE_URL = `${import.meta.env.VITE_API_BASE_URL || ""}/asset/reports`;
 
@@ -128,5 +129,26 @@ export const getDepartmentAssignments = async (department: string, branch?: stri
     return response.data.data ?? [];
   } catch (error) {
     return handleAxiosError(error, "Failed to load department assignments");
+  }
+};
+
+export interface MonthlyPurchaseDetailRecord extends AssetInventoryRecord {
+  AssetKind?: "IT" | "Non-IT" | string;
+}
+
+// Assets purchased in one calendar month (month is 1-12).
+export const getMonthlyPurchaseDetail = async (year: number, month: number, branch?: string): Promise<MonthlyPurchaseDetailRecord[]> => {
+  try {
+    const params: Record<string, string | number> = { year, month };
+    if (branch && branch !== "All Branches" && branch !== "All") {
+      params.branch = branch;
+    }
+    const response = await axios.get<ApiResponse<MonthlyPurchaseDetailRecord[]>>(`${API_BASE_URL}/monthly-purchase-detail`, {
+      headers: getAuthHeaders(),
+      params,
+    });
+    return response.data.data ?? [];
+  } catch (error) {
+    return handleAxiosError(error, "Failed to load monthly purchase detail");
   }
 };

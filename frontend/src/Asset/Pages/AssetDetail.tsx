@@ -43,6 +43,7 @@ import {
 
 const STATUS_BADGE_COLOR: Record<AssetStatus, "success" | "danger" | "informative" | "warning" | "subtle"> = {
   Assigned: "success",
+  "In Use": "success",
   "In Stock": "informative",
   "Under Maintenance": "warning",
   "End of Use": "subtle",

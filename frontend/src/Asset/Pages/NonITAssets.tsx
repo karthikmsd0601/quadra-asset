@@ -1493,7 +1493,9 @@ const NonITAssets: React.FC<NonITAssetsProps> = ({ topToggle }) => {
         open={formOpen}
         onOpenChange={setFormOpen}
         asset={editingAsset}
+        currentUserId={currentUserId}
         onSaved={loadAll}
+        onAssetChanged={setEditingAsset}
       />
     </div>
   );

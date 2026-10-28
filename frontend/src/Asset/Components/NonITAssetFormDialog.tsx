@@ -702,13 +702,13 @@ const NonITAssetFormDialog: React.FC<NonITAssetFormDialogProps> = ({
                   >
                     <DocumentRegular style={{ fontSize: 14, color: "#007ED5" }} />
                     <span style={{ maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                      {att.FileName || att.RelativePath || `Attachment ${i + 1}`}
+                      {att.fileName || att.relativePath || `Attachment ${i + 1}`}
                     </span>
                     <button
                       type="button"
                       onClick={async (e) => {
                         e.stopPropagation();
-                        const updated = await deleteNonITAssetAttachment(asset.ID, att.RelativePath);
+                        const updated = await deleteNonITAssetAttachment(asset.ID, att.relativePath);
                         onAssetChanged({ ...asset, Attachments: updated });
                       }}
                       style={{

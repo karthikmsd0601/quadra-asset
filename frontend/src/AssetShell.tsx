@@ -114,10 +114,12 @@ export default function AssetShell({ children }: { children: ReactNode }) {
   const [globalSearch, setGlobalSearch] = useState("");
   const [searchScope, setSearchScope] = useState<SearchScopeKey>("inventory");
   const [searchScopeOpen, setSearchScopeOpen] = useState(false);
+  const [userPopupOpen, setUserPopupOpen] = useState(false);
 
   const roleMenuRef = useRef<HTMLDivElement>(null);
   const appLauncherRef = useRef<HTMLDivElement>(null);
   const searchScopeRef = useRef<HTMLDivElement>(null);
+  const userPopupRef = useRef<HTMLDivElement>(null);
 
   // Close menus on click outside
   useEffect(() => {
@@ -130,6 +132,9 @@ export default function AssetShell({ children }: { children: ReactNode }) {
       }
       if (searchScopeRef.current && !searchScopeRef.current.contains(event.target as Node)) {
         setSearchScopeOpen(false);
+      }
+      if (userPopupRef.current && !userPopupRef.current.contains(event.target as Node)) {
+        setUserPopupOpen(false);
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
@@ -516,8 +521,46 @@ export default function AssetShell({ children }: { children: ReactNode }) {
                   )}
                 </div>
 
-                <div onClick={() => setUserPopupOpen((prev) => !prev)} style={{ cursor: "pointer" }} title="My Profile">
-                  <Avatar name={currentUser.displayName} color="brand" size={32} />
+                <div className="asset-role-switcher-container" ref={userPopupRef}>
+                  <button
+                    type="button"
+                    onClick={() => setUserPopupOpen((prev) => !prev)}
+                    title="My Profile"
+                    aria-expanded={userPopupOpen}
+                    style={{ background: "transparent", border: "none", padding: 0, cursor: "pointer", display: "flex", borderRadius: "50%" }}
+                  >
+                    <Avatar name={currentUser.displayName} color="brand" size={32} />
+                  </button>
+
+                  {userPopupOpen && (
+                    <div className="asset-role-menu" style={{ width: "260px", padding: "14px" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                        <Avatar name={currentUser.displayName} color="brand" size={40} />
+                        <div className="asset-role-item-info" style={{ minWidth: 0 }}>
+                          <strong style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            {currentUser.displayName}
+                          </strong>
+                          <small style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            {currentUser.email}
+                          </small>
+                        </div>
+                      </div>
+                      <div style={{ height: "1px", background: "#F1F5F9", margin: "10px 0 6px" }} />
+                      {[
+                        { label: "Role", value: currentUser.roleName },
+                        { label: "Department", value: currentUser.department || "—" },
+                        { label: "Group", value: currentUser.group || "—" },
+                      ].map((row) => (
+                        <div
+                          key={row.label}
+                          style={{ display: "flex", justifyContent: "space-between", gap: "12px", padding: "4px 2px", fontSize: "12px" }}
+                        >
+                          <span style={{ color: "#64748B" }}>{row.label}</span>
+                          <span style={{ color: "#1E293B", fontWeight: 600, textAlign: "right" }}>{row.value}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             </header>

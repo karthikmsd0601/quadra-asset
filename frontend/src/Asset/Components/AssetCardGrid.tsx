@@ -36,7 +36,9 @@ const AssetCardGrid: React.FC<AssetCardGridProps> = ({
             borderRadius: "16px",
             overflow: "hidden",
             cursor: "pointer",
-            border: isSelected ? "2px solid #007ED5" : "1px solid rgba(226, 232, 240, 0.85)",
+            // Keep the border width constant so selecting a card doesn't shift the grid.
+            border: isSelected ? "1px solid #007ED5" : "1px solid rgba(226, 232, 240, 0.85)",
+            outline: isSelected ? "1px solid #007ED5" : "none",
             position: "relative",
             transition: "all 0.25s cubic-bezier(0.16, 1, 0.3, 1)",
           }}
@@ -52,7 +54,12 @@ const AssetCardGrid: React.FC<AssetCardGridProps> = ({
         >
           {selectable && (
             <div style={{ position: "absolute", top: "10px", left: "10px", zIndex: 2, background: "rgba(255, 255, 255, 0.9)", backdropFilter: "blur(4px)", borderRadius: "6px", padding: "2px" }}>
-              <Checkbox checked={isSelected} onChange={() => onToggleSelect?.(asset)} onClick={(e) => e.stopPropagation()} />
+              <Checkbox
+                checked={isSelected}
+                aria-label={`Select ${asset.Category || asset.AssetName} ${asset.AssetTagID}`}
+                onChange={() => onToggleSelect?.(asset)}
+                onClick={(e) => e.stopPropagation()}
+              />
             </div>
           )}
           <div

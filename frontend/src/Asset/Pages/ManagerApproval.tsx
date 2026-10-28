@@ -45,6 +45,7 @@ import {
   AssetUserRequestRecord,
   managerActionOnRequest,
   managerReprogressRequest,
+  RequestOverallStatus,
 } from "../Services/AssetInventoryService";
 import {
   getAssetUpgradeRequests,
@@ -65,6 +66,10 @@ type DecisionType = "Approve" | "Reject" | "Reprogress";
 type ManagerTab = "All" | "Pending" | "Approved";
 
 const PAGE_SIZE = 12;
+
+// Older saved decisions stored a bare "Rejected", which isn't a valid overall status.
+const normalizeOverall = (value: unknown): RequestOverallStatus | undefined =>
+  value === "Rejected" ? "ManagerRejected" : (value as RequestOverallStatus | undefined) || undefined;
 
 const getPageNumbers = (current: number, total: number): (number | "...")[] => {
   if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
@@ -383,7 +388,7 @@ const ManagerApproval: React.FC = () => {
           return {
             ...r,
             ManagerApprovalStatus: overrides[r.ID].status || r.ManagerApprovalStatus,
-            OverallStatus: overrides[r.ID].overall || r.OverallStatus,
+            OverallStatus: normalizeOverall(overrides[r.ID].overall) || r.OverallStatus,
             ManagerApprovedReason: overrides[r.ID].reason || r.ManagerApprovedReason,
             ManagerApprovedDate: overrides[r.ID].date || r.ManagerApprovedDate,
           };
@@ -403,7 +408,7 @@ const ManagerApproval: React.FC = () => {
             ? {
                 ...r,
                 ManagerApprovalStatus: overrides[r.ID].status || r.ManagerApprovalStatus,
-                OverallStatus: overrides[r.ID].overall || r.OverallStatus,
+                OverallStatus: normalizeOverall(overrides[r.ID].overall) || r.OverallStatus,
                 ManagerApprovedReason: overrides[r.ID].reason || r.ManagerApprovedReason,
                 ManagerApprovedDate: overrides[r.ID].date || r.ManagerApprovedDate,
               }
@@ -597,8 +602,9 @@ const ManagerApproval: React.FC = () => {
     if (!reviewingRequest || !currentUser?.userID) return;
     setSubmittingDecision(true);
 
-    const nextStatus = selectedDecision === "Approve" ? "Approved" : selectedDecision === "Reject" ? "Rejected" : "Pending";
-    const nextOverall = selectedDecision === "Approve" ? "PendingAdminApproval" : selectedDecision === "Reject" ? "Rejected" : "PendingManagerApproval";
+    const nextStatus = selectedDecision === "Approve" ? "Approved" : selectedDecision === "Reject" ? "Rejected" : "Re-Progress";
+    const nextOverall: RequestOverallStatus =
+      selectedDecision === "Approve" ? "PendingAdminApproval" : selectedDecision === "Reject" ? "ManagerRejected" : "ManagerReprogress";
     const decisionDate = new Date().toISOString();
 
     // 1. Immediately persist in localStorage

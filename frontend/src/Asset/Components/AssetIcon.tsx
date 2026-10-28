@@ -29,7 +29,8 @@ interface AssetIconProps {
 }
 
 interface CategoryConfig {
-  icon: React.ComponentType<{ size?: number; className?: string; strokeWidth?: number; color?: string }>;
+  // Either a lucide-react icon or AssetMouseIcon; both take size, strokeWidth, color and className.
+  icon: React.ElementType;
   bg: string;
   color: string;
   border?: string;

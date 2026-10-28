@@ -28,9 +28,10 @@ export const REQUEST_STATUS_LABEL: Record<RequestOverallStatus, string> = {
   PendingManagerApproval: "Manager Pending",
   PendingAdminApproval: "Admin Pending (Manager Approved)",
   Completed: "Admin Approved",
+  Cancelled: "Cancelled",
 };
 
-export const REQUEST_STATUS_COLOR: Record<RequestOverallStatus, "success" | "warning" | "danger" | "informative"> = {
+export const REQUEST_STATUS_COLOR: Record<RequestOverallStatus, "success" | "warning" | "danger" | "informative" | "subtle"> = {
   ManagerPending: "warning",
   ManagerReprogress: "warning",
   ManagerRejected: "danger",
@@ -41,6 +42,7 @@ export const REQUEST_STATUS_COLOR: Record<RequestOverallStatus, "success" | "war
   PendingManagerApproval: "warning",
   PendingAdminApproval: "informative",
   Completed: "success",
+  Cancelled: "subtle",
 };
 
 // Live per-tab counts for the status filter row — "All" is the total, every

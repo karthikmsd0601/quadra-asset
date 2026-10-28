@@ -192,7 +192,7 @@ export const LostIncidentDetailsPanel: React.FC<LostIncidentDetailsPanelProps> =
 
   if (!request) return null;
 
-  const isResolved = request.RequestStatus === "Resolved" || request.RequestStatus === "Closed";
+  const isResolved = request.RequestStatus === "Completed" || request.RequestStatus === "Cancelled";
   const isActionable = !isResolved;
   const pendingItems = items.filter((i) => i.ItemStatus === "Pending");
   const currentTargetItem = items.find((i) => i.ID === selectedTargetItemId) || items[0];
@@ -375,10 +375,10 @@ export const LostIncidentDetailsPanel: React.FC<LostIncidentDetailsPanelProps> =
               dateLabel={`Loss Date: ${formatDate(request.LostDate)} · Reported ${formatDate(request.CreatedAt)}`}
               status={request.RequestStatus}
               statusColor={
-                request.RequestStatus === "Approved" || request.RequestStatus === "Resolved"
+                request.RequestStatus === "Completed"
                   ? "success"
-                  : request.RequestStatus === "Rejected"
-                  ? "danger"
+                  : request.RequestStatus === "InProgress"
+                  ? "informative"
                   : "warning"
               }
               icon={<WarningRegular style={{ color: "#DC2626" }} />}
@@ -490,7 +490,7 @@ export const LostIncidentDetailsPanel: React.FC<LostIncidentDetailsPanelProps> =
                       <Badge
                         appearance="tint"
                         color={
-                          item.ItemStatus === "Approved"
+                          item.ItemStatus === "Replaced"
                             ? "success"
                             : item.ItemStatus === "Rejected"
                             ? "danger"

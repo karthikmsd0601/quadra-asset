@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, Text, Badge, Spinner, Toast, ToastTitle, Toaster, useToastController, useId } from "@fluentui/react-components";
-import { WarningRegular } from "@fluentui/react-icons";
+import { ArrowSwapRegular, BoxRegular, WarningRegular } from "@fluentui/react-icons";
 import { useAuth } from "../../Auth/AuthProvider";
 import AssetCardGrid from "../Components/AssetCardGrid";
+import ReportLostAssetPanel from "../Components/ReportLostAssetPanel";
 import { getUserAssignedAssets, UserAssignedAsset } from "../Services/AssetEmployeeService";
 import { getPendingLostItemsForUser, PendingLostItemRecord } from "../Services/AssetLostRequestService";
 import NewAssetRequestButton from "../Components/NewAssetRequestButton";
@@ -20,6 +21,7 @@ const EmployeeMyAssets: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [pendingLostItems, setPendingLostItems] = useState<PendingLostItemRecord[]>([]);
   const [selectedAssetIds, setSelectedAssetIds] = useState<Set<string>>(new Set());
+  const [reportLostOpen, setReportLostOpen] = useState(false);
 
   const loadData = async () => {
     if (!currentUser?.userID) return;
@@ -80,7 +82,37 @@ const EmployeeMyAssets: React.FC = () => {
           <Text size={600} weight="semibold" style={{ fontSize: "24px", lineHeight: "32px" }}>
             My Assets
           </Text>
-          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
+            <button
+              type="button"
+              onClick={() => navigate("/Asset/my-assets/handover")}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "8px",
+                background: "#FFFFFF",
+                color: "#1E293B",
+                border: "1px solid #E2E8F0",
+                borderRadius: "9999px",
+                padding: "10px 18px",
+                fontSize: "14px",
+                fontWeight: 600,
+                cursor: "pointer",
+                boxShadow: "0 1px 3px rgba(0, 0, 0, 0.05)",
+                transition: "all 0.15s ease",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.borderColor = "#CBD5E1";
+                e.currentTarget.style.boxShadow = "0 2px 8px rgba(0, 126, 213, 0.12)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.borderColor = "#E2E8F0";
+                e.currentTarget.style.boxShadow = "0 1px 3px rgba(0, 0, 0, 0.05)";
+              }}
+            >
+              <ArrowSwapRegular style={{ fontSize: "16px", color: "#007ED5" }} />
+              <span>Request Handover</span>
+            </button>
             <NewAssetRequestButton />
           </div>
         </div>
@@ -113,19 +145,74 @@ const EmployeeMyAssets: React.FC = () => {
             )}
 
             {assets.length === 0 ? (
-              <Card style={{ padding: "40px", textAlign: "center" }}>
-                <Text style={{ color: "#605E5C" }}>No assets are currently assigned to you.</Text>
+              <Card style={{ padding: "48px 20px", textAlign: "center", borderRadius: "16px" }}>
+                <BoxRegular style={{ fontSize: "40px", color: "#94A3B8", margin: "0 auto 12px", display: "block" }} />
+                <Text weight="semibold" style={{ display: "block", color: "#334155", fontSize: "15px" }}>
+                  No assets are currently assigned to you
+                </Text>
+                <Text style={{ display: "block", color: "#64748B", fontSize: "13px", marginTop: "6px" }}>
+                  Raise a new asset request to have equipment assigned.
+                </Text>
               </Card>
             ) : (
-              <AssetCardGrid
-                assets={assets}
-                onSelect={(asset) => navigate(`/Asset/my-assets/${asset.AssetID}`)}
-                pendingLostAssetIds={pendingReviewAssetIds}
-              />
+              <>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "10px" }}>
+                  <Text size={200} style={{ color: "#64748B" }}>
+                    Select an asset to report it lost:
+                  </Text>
+                  <button
+                    type="button"
+                    disabled={selectedAssetIds.size === 0}
+                    onClick={() => setReportLostOpen(true)}
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "6px",
+                      background: selectedAssetIds.size > 0 ? "#EF4444" : "#F1F5F9",
+                      color: selectedAssetIds.size > 0 ? "#FFFFFF" : "#94A3B8",
+                      border: "none",
+                      borderRadius: "9999px",
+                      padding: "7px 16px",
+                      fontSize: "13px",
+                      fontWeight: 600,
+                      cursor: selectedAssetIds.size > 0 ? "pointer" : "not-allowed",
+                      boxShadow: selectedAssetIds.size > 0 ? "0 2px 6px rgba(239, 68, 68, 0.25)" : "none",
+                      transition: "all 0.15s ease",
+                    }}
+                  >
+                    <WarningRegular style={{ fontSize: "14px" }} />
+                    <span>Report Lost{selectedAssetIds.size > 0 ? ` (${selectedAssetIds.size})` : ""}</span>
+                  </button>
+                </div>
+                <AssetCardGrid
+                  assets={assets}
+                  onSelect={(asset) => navigate(`/Asset/my-assets/${asset.AssetID}`)}
+                  selectable
+                  selectedIds={selectedAssetIds}
+                  onToggleSelect={toggleAssetSelect}
+                  pendingLostAssetIds={pendingReviewAssetIds}
+                />
+              </>
             )}
           </>
         )}
       </div>
+
+      {currentUser?.userID && (
+        <ReportLostAssetPanel
+          open={reportLostOpen}
+          onOpenChange={setReportLostOpen}
+          employeeUserId={currentUser.userID}
+          employeeName={currentUser.displayName ?? "You"}
+          reportedByUserId={currentUser.userID}
+          reportedByRole="Employee"
+          assets={selectedAssetsForReport}
+          onCreated={() => {
+            setSelectedAssetIds(new Set());
+            loadData();
+          }}
+        />
+      )}
     </>
   );
 };

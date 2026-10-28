@@ -28,6 +28,7 @@ import {
 } from "@fluentui/react-components";
 import {
   ArrowLeftRegular,
+  ShieldPersonRegular,
   MailRegular,
   BuildingRegular,
   BoxRegular,
@@ -57,7 +58,9 @@ import {
   returnAssetFromUser,
   AssetInventoryRecord,
 } from "../Services/AssetInventoryService";
-import { getAssetRoleMismatchesForUser } from "../Services/AssetRoleTemplateService";
+import { getAssetRoleMismatchesForUser, getAssetRoleCategoryUsage } from "../Services/AssetRoleTemplateService";
+import AssignAssetRoleDialog from "../Components/AssignAssetRoleDialog";
+import { RoleAllowanceStrip, useRoleAllowance } from "../Components/RoleAllowance";
 import { getPendingLostItemsForUser } from "../Services/AssetLostRequestService";
 import ReportLostAssetPanel from "../Components/ReportLostAssetPanel";
 import QuadraPillToggle from "../../Common/QuadraPillToggle";
@@ -115,6 +118,9 @@ const EmployeeAssetDetail: React.FC = () => {
   const [targetLostAsset, setTargetLostAsset] = useState<UserAssignedAsset | null>(null);
   const [pendingLostAssetIds, setPendingLostAssetIds] = useState<Set<string>>(new Set());
   const [reportLostOpen, setReportLostOpen] = useState(false);
+  const [assignRoleOpen, setAssignRoleOpen] = useState(false);
+  // Category allowances from the employee's Asset Role (enforced when adding assets).
+  const allowance = useRoleAllowance(userId);
 
   const loadData = async () => {
     if (!userId) {
@@ -146,11 +152,17 @@ const EmployeeAssetDetail: React.FC = () => {
         };
       }
 
-      const [userAssets, mismatches, pendingLost] = await Promise.all([
+      const [userAssets, mismatches, pendingLost, roleUsage] = await Promise.all([
         getUserAssignedAssets(userId).catch(() => []),
         getAssetRoleMismatchesForUser(userId).catch(() => []),
         getPendingLostItemsForUser(userId).catch(() => []),
+        getAssetRoleCategoryUsage(userId).catch(() => null),
       ]);
+
+      // The server's role assignment wins over whatever the profile lookup returned.
+      if (roleUsage && !roleUsage.roleTemplateId?.startsWith("demo-")) {
+        emp = { ...emp, AssetRole: roleUsage.roleTemplateId, AssetRoleName: roleUsage.roleName };
+      }
 
       setEmployee(emp);
       setAssets(userAssets || []);
@@ -241,6 +253,17 @@ const EmployeeAssetDetail: React.FC = () => {
 
   const handleAssign = async () => {
     if (!userId || !selectedAssetId || !currentUser?.userID) return;
+    const picked = inStockAssets.find((a) => a.ID === selectedAssetId);
+    const blocked = allowance.blockReason(picked?.Category);
+    if (blocked) {
+      dispatchToast(
+        <Toast>
+          <ToastTitle>Can't assign this {picked?.Category ?? "asset"}: {blocked}.</ToastTitle>
+        </Toast>,
+        { intent: "error" }
+      );
+      return;
+    }
     setAssigning(true);
     try {
       await assignAssetToUser(selectedAssetId, userId, currentUser.userID);
@@ -252,6 +275,7 @@ const EmployeeAssetDetail: React.FC = () => {
       );
       setAddOpen(false);
       await loadData();
+      allowance.reload();
     } catch (error) {
       dispatchToast(
         <Toast>
@@ -277,6 +301,7 @@ const EmployeeAssetDetail: React.FC = () => {
       );
       setRemoveTarget(null);
       await loadData();
+      allowance.reload();
     } catch (error) {
       dispatchToast(
         <Toast>
@@ -392,6 +417,42 @@ const EmployeeAssetDetail: React.FC = () => {
                   </h1>
                   <div style={{ fontSize: "15px", color: "#64748B", marginTop: "4px", fontWeight: 500 }}>
                     {employee.JobTitle || "Frontend Developer"}
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "10px", flexWrap: "wrap" }}>
+                    <span
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "5px",
+                        background: employee.AssetRoleName ? "#F5F3FF" : "#FFFBEB",
+                        color: employee.AssetRoleName ? "#6D28D9" : "#B45309",
+                        border: `1px solid ${employee.AssetRoleName ? "#DDD6FE" : "#FDE68A"}`,
+                        borderRadius: "9999px",
+                        padding: "3px 10px",
+                        fontSize: "12px",
+                        fontWeight: 600,
+                      }}
+                    >
+                      <ShieldPersonRegular style={{ fontSize: "13px" }} />
+                      {employee.AssetRoleName ? `Asset Role: ${employee.AssetRoleName}` : "No Asset Role assigned"}
+                    </span>
+                    {currentUser?.permissions?.admin && (
+                      <button
+                        type="button"
+                        onClick={() => setAssignRoleOpen(true)}
+                        style={{
+                          border: "none",
+                          background: "transparent",
+                          color: "#007ED5",
+                          fontSize: "12.5px",
+                          fontWeight: 600,
+                          cursor: "pointer",
+                          padding: "3px 4px",
+                        }}
+                      >
+                        {employee.AssetRoleName ? "Change role" : "Assign Asset Role"}
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -513,32 +574,36 @@ const EmployeeAssetDetail: React.FC = () => {
 
             {/* Section Header with + Add Asset Pill Button */}
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "16px", marginTop: "8px" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "12px 16px", flexWrap: "wrap" }}>
                 <h2 style={{ margin: 0, fontSize: "22px", fontWeight: 700, color: "#0F172A" }}>
                   Assigned Assets
                 </h2>
                 <button
                   onClick={openAddDialog}
+                  disabled={!employee.AssetRoleName}
+                  title={employee.AssetRoleName ? undefined : "Assign an Asset Role to this employee before adding assets."}
                   style={{
                     display: "inline-flex",
                     alignItems: "center",
                     gap: "6px",
-                    background: "#ffffff",
-                    border: "1.5px solid #007ED5",
-                    color: "#007ED5",
+                    background: employee.AssetRoleName ? "#ffffff" : "#F1F5F9",
+                    border: `1.5px solid ${employee.AssetRoleName ? "#007ED5" : "#E2E8F0"}`,
+                    color: employee.AssetRoleName ? "#007ED5" : "#94A3B8",
                     borderRadius: "9999px",
                     padding: "7px 18px",
                     fontSize: "13.5px",
                     fontWeight: 600,
-                    cursor: "pointer",
-                    boxShadow: "0 1px 3px rgba(0, 126, 213, 0.1)",
+                    cursor: employee.AssetRoleName ? "pointer" : "not-allowed",
+                    boxShadow: employee.AssetRoleName ? "0 1px 3px rgba(0, 126, 213, 0.1)" : "none",
                     transition: "all 0.15s ease",
                   }}
                   onMouseEnter={(e) => {
+                    if (!employee.AssetRoleName) return;
                     e.currentTarget.style.background = "#007ED5";
                     e.currentTarget.style.color = "#ffffff";
                   }}
                   onMouseLeave={(e) => {
+                    if (!employee.AssetRoleName) return;
                     e.currentTarget.style.background = "#ffffff";
                     e.currentTarget.style.color = "#007ED5";
                   }}
@@ -546,6 +611,20 @@ const EmployeeAssetDetail: React.FC = () => {
                   <AddRegular style={{ fontSize: "15px" }} />
                   <span>Add Asset</span>
                 </button>
+                {!employee.AssetRoleName && (
+                  <span style={{ fontSize: "12.5px", color: "#B45309" }}>
+                    Assign an Asset Role to this employee before adding assets.{" "}
+                    {currentUser?.permissions?.admin && (
+                      <button
+                        type="button"
+                        onClick={() => setAssignRoleOpen(true)}
+                        style={{ border: "none", background: "transparent", color: "#007ED5", fontWeight: 600, cursor: "pointer", padding: 0, fontSize: "inherit" }}
+                      >
+                        Assign now
+                      </button>
+                    )}
+                  </span>
+                )}
               </div>
 
               <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
@@ -927,14 +1006,21 @@ const EmployeeAssetDetail: React.FC = () => {
                 <Badge appearance="tint" color="informative">
                   {assets.length} Active {assets.length === 1 ? "Asset" : "Assets"}
                 </Badge>
-                <Badge appearance="tint" color="success">
-                  Eligible for Allocation
-                </Badge>
+                {!allowance.loading && (
+                  <Badge appearance="tint" color={allowance.roleName ? "success" : "warning"}>
+                    {allowance.roleName ? "Eligible for Allocation" : "No Asset Role"}
+                  </Badge>
+                )}
               </div>
             </div>
 
             {/* Search & Category Filter Controls */}
             <div style={{ padding: "16px 24px 8px 24px", display: "flex", flexDirection: "column", gap: "12px" }}>
+              <RoleAllowanceStrip
+                allowance={allowance}
+                employeeName={employee?.DisplayName}
+                onAssignRole={currentUser?.permissions?.admin ? () => setAssignRoleOpen(true) : undefined}
+              />
               <Input
                 placeholder="Search available assets by name, tag ID, brand, model, serial..."
                 value={assetQuery}
@@ -1042,11 +1128,14 @@ const EmployeeAssetDetail: React.FC = () => {
                 <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
                   {filteredInStock.map((asset) => {
                     const isSelected = selectedAssetId === asset.ID;
+                    const blocked = allowance.loading ? null : allowance.blockReason(asset.Category);
                     const catTheme = getCategoryTheme(asset.Category);
                     return (
                       <div
                         key={asset.ID}
-                        onClick={() => setSelectedAssetId(asset.ID)}
+                        onClick={() => !blocked && setSelectedAssetId(asset.ID)}
+                        aria-disabled={!!blocked}
+                        title={blocked ?? undefined}
                         style={{
                           display: "flex",
                           alignItems: "center",
@@ -1055,7 +1144,8 @@ const EmployeeAssetDetail: React.FC = () => {
                           borderRadius: "12px",
                           border: isSelected ? "2px solid #007ED5" : "1px solid #E2E8F0",
                           background: isSelected ? "#F0F7FF" : "#FFFFFF",
-                          cursor: "pointer",
+                          cursor: blocked ? "not-allowed" : "pointer",
+                          opacity: blocked ? 0.55 : 1,
                           transition: "all 0.15s ease",
                         }}
                       >
@@ -1106,6 +1196,20 @@ const EmployeeAssetDetail: React.FC = () => {
                               >
                                 In Stock
                               </span>
+                              {blocked && (
+                                <span
+                                  style={{
+                                    fontSize: "11px",
+                                    fontWeight: 600,
+                                    background: "#FEF2F2",
+                                    color: "#B91C1C",
+                                    padding: "2px 8px",
+                                    borderRadius: "6px",
+                                  }}
+                                >
+                                  {blocked === "Limit reached" ? "Limit reached" : "Not in role"}
+                                </span>
+                              )}
                             </div>
 
                             <div
@@ -1298,6 +1402,32 @@ const EmployeeAssetDetail: React.FC = () => {
             setTargetLostAsset(null);
             loadData();
           }}
+        />
+      )}
+
+      {employee && (
+        <AssignAssetRoleDialog
+          open={assignRoleOpen}
+          onOpenChange={setAssignRoleOpen}
+          targets={[{ ID: employee.ID, DisplayName: employee.DisplayName, AssetRole: employee.AssetRole }]}
+          onSaved={(message) => {
+            dispatchToast(
+              <Toast>
+                <ToastTitle>{message}</ToastTitle>
+              </Toast>,
+              { intent: "success" }
+            );
+            loadData();
+            allowance.reload();
+          }}
+          onError={(message) =>
+            dispatchToast(
+              <Toast>
+                <ToastTitle>{message}</ToastTitle>
+              </Toast>,
+              { intent: "error" }
+            )
+          }
         />
       )}
     </>

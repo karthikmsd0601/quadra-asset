@@ -10,10 +10,15 @@ import {
   adminActionOnUpgradeRequest,
   managerReprogressUpgradeRequest,
   adminReprogressUpgradeRequest,
+  cancelAssetUpgradeRequest,
 } from "../Services/AssetUpgradeRequestService";
 import UpgradeRequestDetailsPanel from "./UpgradeRequestDetailsPanel";
+import CancelRequestDialog from "./CancelRequestDialog";
 
-const STATUS_COLOR: Record<string, "warning" | "informative" | "success" | "danger"> = {
+// A requestor may withdraw an upgrade until it is completed or rejected.
+const CANCELLABLE_UPGRADE_STATUSES = ["Pending", "ManagerReprogress", "AdminApprovalPending", "AdminReprogress"];
+
+const STATUS_COLOR: Record<string, "warning" | "informative" | "success" | "danger" | "subtle"> = {
   Pending: "warning",
   ManagerRejected: "danger",
   ManagerReprogress: "warning",
@@ -21,6 +26,7 @@ const STATUS_COLOR: Record<string, "warning" | "informative" | "success" | "dang
   AdminReprogress: "warning",
   Completed: "success",
   Rejected: "danger",
+  Cancelled: "subtle",
 };
 
 const STATUS_LABEL: Record<string, string> = {
@@ -31,6 +37,7 @@ const STATUS_LABEL: Record<string, string> = {
   AdminReprogress: "Admin Reprogress",
   Completed: "Completed",
   Rejected: "Rejected by Admin",
+  Cancelled: "Cancelled",
 };
 
 // Every hardware upgrade request sits in exactly one of these buckets — same
@@ -44,6 +51,7 @@ const STATUS_TABS_ALL: { label: string; value: UpgradeReqStatus | "All" }[] = [
   { label: "Admin Reprogress", value: "AdminReprogress" },
   { label: "Completed", value: "Completed" },
   { label: "Rejected", value: "Rejected" },
+  { label: "Cancelled", value: "Cancelled" },
 ];
 
 const EMPLOYEE_STATUS_TABS: { label: string; value: string }[] = [
@@ -52,6 +60,7 @@ const EMPLOYEE_STATUS_TABS: { label: string; value: string }[] = [
   { label: "In Progress", value: "InProgress" },
   { label: "Completed", value: "Completed" },
   { label: "Rejected", value: "Rejected" },
+  { label: "Cancelled", value: "Cancelled" },
 ];
 
 const formatDate = (value: string | null) => (value ? new Date(value).toLocaleDateString("en-IN") : "-");
@@ -71,8 +80,31 @@ const UpgradeRequestList: React.FC<UpgradeRequestListProps> = ({ requests, role,
   const [detailsRequest, setDetailsRequest] = useState<AssetUpgradeRequestRecord | null>(null);
   const [reprogressId, setReprogressId] = useState<string | null>(null);
   const [reprogressReason, setReprogressReason] = useState("");
+  const [cancelRequest, setCancelRequest] = useState<AssetUpgradeRequestRecord | null>(null);
 
   const tabs = role === "employee" ? EMPLOYEE_STATUS_TABS : STATUS_TABS_ALL;
+
+  const handleCancel = async (reason: string) => {
+    if (!cancelRequest || !currentUser?.userID) return;
+    try {
+      await cancelAssetUpgradeRequest(cancelRequest.ID, currentUser.userID, reason);
+      dispatchToast(
+        <Toast>
+          <ToastTitle>Request cancelled</ToastTitle>
+        </Toast>,
+        { intent: "success" }
+      );
+      onActionComplete();
+    } catch (error) {
+      dispatchToast(
+        <Toast>
+          <ToastTitle>{error instanceof Error ? error.message : "Failed to cancel request"}</ToastTitle>
+        </Toast>,
+        { intent: "error" }
+      );
+      throw error;
+    }
+  };
 
   const statusTabCounts = useMemo(() => {
     const counts = { All: requests.length } as Record<string, number>;
@@ -81,6 +113,7 @@ const UpgradeRequestList: React.FC<UpgradeRequestListProps> = ({ requests, role,
       counts["InProgress"] = requests.filter((r) => ["AdminApprovalPending", "ManagerReprogress", "AdminReprogress"].includes(r.ReqStatus)).length;
       counts["Completed"] = requests.filter((r) => r.ReqStatus === "Completed").length;
       counts["Rejected"] = requests.filter((r) => ["ManagerRejected", "Rejected"].includes(r.ReqStatus)).length;
+      counts["Cancelled"] = requests.filter((r) => r.ReqStatus === "Cancelled").length;
     } else {
       STATUS_TABS_ALL.forEach((tab) => {
         if (tab.value === "All") return;
@@ -97,6 +130,7 @@ const UpgradeRequestList: React.FC<UpgradeRequestListProps> = ({ requests, role,
       if (activeTab === "InProgress") return requests.filter((r) => ["AdminApprovalPending", "ManagerReprogress", "AdminReprogress"].includes(r.ReqStatus));
       if (activeTab === "Completed") return requests.filter((r) => r.ReqStatus === "Completed");
       if (activeTab === "Rejected") return requests.filter((r) => ["ManagerRejected", "Rejected"].includes(r.ReqStatus));
+      if (activeTab === "Cancelled") return requests.filter((r) => r.ReqStatus === "Cancelled");
     }
     return requests.filter((r) => r.ReqStatus === activeTab);
   }, [requests, activeTab, role]);
@@ -115,6 +149,7 @@ const UpgradeRequestList: React.FC<UpgradeRequestListProps> = ({ requests, role,
           currentUser.userID,
           currentUser.displayName,
           currentUser.email,
+          undefined,
           isOverride
         );
       }
@@ -302,6 +337,17 @@ const UpgradeRequestList: React.FC<UpgradeRequestListProps> = ({ requests, role,
                       <Text size={200} style={{ color: "#64748b", fontWeight: 500 }}>
                         {formatDate(request.RequestedDate ?? request.CreatedAt)}
                       </Text>
+                      <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                      {CANCELLABLE_UPGRADE_STATUSES.includes(request.ReqStatus) && (
+                        <Button
+                          appearance="subtle"
+                          icon={<DismissCircleRegular />}
+                          style={{ color: "#DC2626", borderRadius: "25px", fontWeight: 600 }}
+                          onClick={() => setCancelRequest(request)}
+                        >
+                          Cancel
+                        </Button>
+                      )}
                       {request.ReqStatus === "ManagerReprogress" || request.ReqStatus === "AdminReprogress" ? (
                         <Button
                           appearance="primary"
@@ -325,6 +371,7 @@ const UpgradeRequestList: React.FC<UpgradeRequestListProps> = ({ requests, role,
                           View Details →
                         </Button>
                       )}
+                      </div>
                     </div>
                   </div>
                 );
@@ -637,6 +684,12 @@ const UpgradeRequestList: React.FC<UpgradeRequestListProps> = ({ requests, role,
           setDetailsRequest(null);
         }}
         onRespondComplete={onActionComplete}
+      />
+      <CancelRequestDialog
+        open={!!cancelRequest}
+        requestLabel={cancelRequest?.RequestNumber}
+        onOpenChange={(open) => !open && setCancelRequest(null)}
+        onConfirm={handleCancel}
       />
     </div>
   );
