@@ -398,7 +398,7 @@ export const UpgradeRequestDetailsPanel: React.FC<UpgradeRequestDetailsPanelProp
                       Clarification Required
                     </div>
                     <div style={{ border: "1px solid #FDE68A", background: "#FFFBEB", borderRadius: "10px", padding: "12px", fontSize: "13px", color: "#92400E" }}>
-                      Reviewer Reason: {pendingReprogress?.ManagerReason || (pendingReprogress as any)?.AdminReason || "Please provide additional specification justification."}
+                      Reviewer Reason: {(pendingReprogress && ("ManagerReason" in pendingReprogress ? pendingReprogress.ManagerReason : pendingReprogress.AdminReason)) || "Please provide additional specification justification."}
                     </div>
                     <Field label="Your Response" required>
                       <Textarea
@@ -456,7 +456,7 @@ export const UpgradeRequestDetailsPanel: React.FC<UpgradeRequestDetailsPanelProp
                               def={opt}
                               selected={selected === opt.kind}
                               onClick={() => {
-                                setSelected(opt.kind);
+                                setSelected(opt.kind as DecisionKind);
                                 setReason("");
                               }}
                             />

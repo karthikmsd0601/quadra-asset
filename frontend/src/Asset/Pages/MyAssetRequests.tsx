@@ -28,10 +28,14 @@ import {
   ArrowClockwiseRegular,
   ArrowDownloadRegular,
   ErrorCircleRegular,
+  ArrowSwapRegular,
+  ListRegular,
+  GridRegular,
+  ChevronRightRegular,
 } from "@fluentui/react-icons";
 import { useAuth } from "../../Auth/AuthProvider";
 import { useThemedMountNode } from "../../Common/useThemedMountNode";
-import { getMyAssetRequests, AssetUserRequestRecord } from "../Services/AssetInventoryService";
+import { getMyAssetRequests, cancelAssetRequest, AssetUserRequestRecord } from "../Services/AssetInventoryService";
 import { getAssetUpgradeRequests, AssetUpgradeRequestRecord } from "../Services/AssetUpgradeRequestService";
 import { getAssetRepairRequests, AssetRepairRequestRecord } from "../Services/AssetRepairRequestService";
 import { getCategoryIcon } from "../Utils/categoryIcon";
@@ -39,9 +43,49 @@ import UpgradeRequestList from "../Components/UpgradeRequestList";
 import RepairRequestList from "../Components/RepairRequestList";
 import QuadraPillToggle from "../../Common/QuadraPillToggle";
 import NewAssetRequestButton from "../Components/NewAssetRequestButton";
-import { getAssetLostRequests, AssetLostRequestRecord } from "../Services/AssetLostRequestService";
+import CancelRequestDialog from "../Components/CancelRequestDialog";
+import AssetRequestDetailsPanel from "../Components/AssetRequestDetailsPanel";
+import { getAssetLostRequests, cancelAssetLostRequest, AssetLostRequestRecord } from "../Services/AssetLostRequestService";
+import {
+  getMyAssetHandoverRequests,
+  cancelAssetHandoverRequest,
+  AssetHandoverRequestRecord,
+} from "../Services/AssetHandoverRequestService";
 
-type RequestTypeView = "all" | "upgrades" | "repairs" | "lost";
+type RequestTypeView = "all" | "upgrades" | "repairs" | "lost" | "handovers";
+type LayoutMode = "list" | "hub";
+
+// Statuses from which the requestor may still withdraw an asset request.
+const CANCELLABLE_ASSET_STATUSES = new Set([
+  "ManagerPending",
+  "ManagerReprogress",
+  "AdminApprovalPending",
+  "AdminReprogress",
+  "PendingManagerApproval",
+  "PendingAdminApproval",
+]);
+
+type CancelTarget =
+  | { kind: "asset"; id: string; label: string }
+  | { kind: "lost"; id: string; label: string }
+  | { kind: "handover"; id: string; label: string };
+
+const STATUS_FILTERS = ["All", "Pending", "In Progress", "Approved", "Rejected", "Cancelled"] as const;
+
+const cancelPillStyle: React.CSSProperties = {
+  background: "#FFFFFF",
+  border: "1px solid #FECACA",
+  borderRadius: "9999px",
+  padding: "7px 14px",
+  fontSize: "13px",
+  fontWeight: 600,
+  color: "#DC2626",
+  cursor: "pointer",
+  display: "inline-flex",
+  alignItems: "center",
+  gap: "6px",
+  transition: "all 0.15s ease",
+};
 
 const formatDate = (value: string | null) =>
   value
@@ -80,6 +124,14 @@ const getCategoryTheme = (category: string) => {
 
 const getStatusBadgeStyle = (status: string) => {
   const s = (status || "").toLowerCase();
+  if (s.includes("cancel")) {
+    return {
+      bg: "#F1F5F9",
+      color: "#64748B",
+      border: "#CBD5E1",
+      label: "Cancelled",
+    };
+  }
   if (s.includes("approved") || s.includes("completed") || s.includes("fulfilled")) {
     return {
       bg: "#ECFDF5",
@@ -132,21 +184,34 @@ const MyAssetRequests: React.FC = () => {
   const [upgradeRequests, setUpgradeRequests] = useState<AssetUpgradeRequestRecord[]>([]);
   const [repairRequests, setRepairRequests] = useState<AssetRepairRequestRecord[]>([]);
   const [lostRequests, setLostRequests] = useState<AssetLostRequestRecord[]>([]);
+  const [handoverRequests, setHandoverRequests] = useState<AssetHandoverRequestRecord[]>([]);
+  // Lost reports this user filed on behalf of team members (e.g. a manager).
+  const [teamLostRequests, setTeamLostRequests] = useState<AssetLostRequestRecord[]>([]);
+  const [lostScope, setLostScope] = useState<"my" | "team">("my");
+  const [respondRequest, setRespondRequest] = useState<AssetUserRequestRecord | null>(null);
+  const [layoutMode, setLayoutMode] = useState<LayoutMode>("list");
+  const [cancelTarget, setCancelTarget] = useState<CancelTarget | null>(null);
 
   const loadData = async () => {
     if (!currentUser?.userID) return;
     setLoading(true);
     try {
-      const [allReqs, upReqs, repReqs, lostReqs] = await Promise.all([
+      const [allReqs, upReqs, repReqs, lostReqs, handoverReqs, reportedLost] = await Promise.all([
         getMyAssetRequests(currentUser.userID),
         getAssetUpgradeRequests({ userId: currentUser.userID }).catch(() => []),
         getAssetRepairRequests({ userId: currentUser.userID }).catch(() => []),
         getAssetLostRequests({ employeeId: currentUser.userID }).catch(() => []),
+        getMyAssetHandoverRequests(currentUser.userID).catch(() => []),
+        getAssetLostRequests({ reportedByUserId: currentUser.userID }).catch(() => []),
       ]);
       setRequests(allReqs);
       setUpgradeRequests(upReqs);
       setRepairRequests(repReqs);
       setLostRequests(lostReqs);
+      setHandoverRequests(handoverReqs);
+      const team = reportedLost.filter((r) => r.EmployeeUserID !== currentUser.userID);
+      setTeamLostRequests(team);
+      if (team.length === 0) setLostScope("my");
     } catch (error) {
       dispatchToast(
         <Toast>
@@ -182,6 +247,50 @@ const MyAssetRequests: React.FC = () => {
     const lostTotal = lostRequests.length;
     return { total, pending, approved, inProgress, upgradesRepairs, lostTotal };
   }, [requests, upgradeRequests, repairRequests, lostRequests]);
+
+  const statusCounts = useMemo(() => {
+    const counts: Record<string, number> = { All: requests.length };
+    requests.forEach((r) => {
+      const label = getStatusBadgeStyle(r.OverallStatus).label;
+      counts[label] = (counts[label] ?? 0) + 1;
+    });
+    return counts;
+  }, [requests]);
+
+  const showError = (error: unknown, fallback: string) =>
+    dispatchToast(
+      <Toast>
+        <ToastTitle>{error instanceof Error ? error.message : fallback}</ToastTitle>
+      </Toast>,
+      { intent: "error" }
+    );
+
+  const handleConfirmCancel = async (reason: string) => {
+    if (!cancelTarget || !currentUser?.userID) return;
+    try {
+      if (cancelTarget.kind === "asset") await cancelAssetRequest(cancelTarget.id, currentUser.userID, reason);
+      else if (cancelTarget.kind === "lost") await cancelAssetLostRequest(cancelTarget.id, currentUser.userID, reason);
+      else await cancelAssetHandoverRequest(cancelTarget.id, currentUser.userID, reason);
+      dispatchToast(
+        <Toast>
+          <ToastTitle>Request cancelled</ToastTitle>
+        </Toast>,
+        { intent: "success" }
+      );
+      setDetailsRequest(null);
+      loadData();
+    } catch (error) {
+      showError(error, "Failed to cancel request");
+      throw error;
+    }
+  };
+
+  const visibleLostRequests = lostScope === "team" ? teamLostRequests : lostRequests;
+
+  const openView = (view: RequestTypeView) => {
+    setActiveView(view);
+    setLayoutMode("list");
+  };
 
   const filteredRequests = useMemo(() => {
     return requests.filter((r) => {
@@ -251,7 +360,7 @@ Generated on: ${new Date().toLocaleString()}
       >
         {/* Header with Title, Subtitle, View Switcher below, and New Request Button on right */}
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", flexWrap: "wrap", gap: "16px" }}>
-          <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: "14px", minWidth: 0, maxWidth: "100%" }}>
             <div>
               <h1 style={{ margin: 0, fontSize: "26px", fontWeight: 700, color: "#0F172A", letterSpacing: "-0.01em" }}>
                 My Requests
@@ -269,14 +378,24 @@ Generated on: ${new Date().toLocaleString()}
                   { key: "upgrades", label: `Upgrades (${upgradeRequests.length})`, icon: <DeveloperBoardRegular /> },
                   { key: "repairs", label: `Repairs (${repairRequests.length})`, icon: <WrenchRegular /> },
                   { key: "lost", label: `Lost Assets (${lostRequests.length})`, icon: <ErrorCircleRegular /> },
+                  { key: "handovers", label: `Handovers (${handoverRequests.length})`, icon: <ArrowSwapRegular /> },
                 ]}
                 value={activeView}
-                onChange={(val) => setActiveView(val)}
+                onChange={(val) => openView(val)}
               />
             </div>
           </div>
 
-          <div>
+          <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
+            <QuadraPillToggle<LayoutMode>
+              size="sm"
+              options={[
+                { key: "list", label: "Card View", icon: <ListRegular /> },
+                { key: "hub", label: "Category Hub", icon: <GridRegular /> },
+              ]}
+              value={layoutMode}
+              onChange={(val) => setLayoutMode(val)}
+            />
             <NewAssetRequestButton />
           </div>
         </div>
@@ -285,7 +404,7 @@ Generated on: ${new Date().toLocaleString()}
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+            gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
             gap: "16px",
           }}
         >
@@ -485,7 +604,276 @@ Generated on: ${new Date().toLocaleString()}
           </div>
         </div>
 
-        {activeView === "upgrades" ? (
+        {layoutMode === "hub" ? (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "16px" }}>
+            {(
+              [
+                {
+                  view: "all",
+                  title: "Asset Requests",
+                  description: "New equipment and hardware requisitions you have raised",
+                  count: requests.length,
+                  icon: <PeopleTeamRegular />,
+                  bg: "#F5F3FF",
+                  border: "#E9D5FF",
+                  color: "#7C3AED",
+                },
+                {
+                  view: "upgrades",
+                  title: "Hardware Upgrade",
+                  description: "RAM, storage, component upgrades and specification changes",
+                  count: upgradeRequests.length,
+                  icon: <DeveloperBoardRegular />,
+                  bg: "#FFFBEB",
+                  border: "#FDE68A",
+                  color: "#B45309",
+                },
+                {
+                  view: "repairs",
+                  title: "Repair Request",
+                  description: "Report hardware damage, malfunctions, and service tickets",
+                  count: repairRequests.length,
+                  icon: <WrenchRegular />,
+                  bg: "#ECFDF5",
+                  border: "#A7F3D0",
+                  color: "#047857",
+                },
+                {
+                  view: "lost",
+                  title: "Lost Assets",
+                  description: "Incident reports for assets that were lost or stolen",
+                  count: lostRequests.length,
+                  icon: <ErrorCircleRegular />,
+                  bg: "#FEF2F2",
+                  border: "#FECACA",
+                  color: "#B91C1C",
+                },
+                {
+                  view: "handovers",
+                  title: "Asset Handover",
+                  description: "Return or hand over assigned equipment to the Asset team",
+                  count: handoverRequests.length,
+                  icon: <ArrowSwapRegular />,
+                  bg: "#EFF6FF",
+                  border: "#BFDBFE",
+                  color: "#1D4ED8",
+                },
+              ] as const
+            ).map((card) => (
+              <button
+                key={card.view}
+                type="button"
+                onClick={() => openView(card.view)}
+                style={{
+                  textAlign: "left",
+                  background: card.bg,
+                  border: `1px solid ${card.border}`,
+                  borderRadius: "16px",
+                  padding: "20px 22px",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "8px",
+                  cursor: "pointer",
+                  transition: "all 0.2s ease",
+                  fontFamily: "inherit",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = "translateY(-2px)";
+                  e.currentTarget.style.boxShadow = "0 8px 20px rgba(15, 23, 42, 0.06)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = "translateY(0)";
+                  e.currentTarget.style.boxShadow = "none";
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <div
+                    style={{
+                      width: "40px",
+                      height: "40px",
+                      borderRadius: "12px",
+                      background: "#FFFFFF",
+                      color: card.color,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: "20px",
+                    }}
+                  >
+                    {card.icon}
+                  </div>
+                  <span style={{ fontSize: "22px", fontWeight: 700, color: card.color }}>{card.count}</span>
+                </div>
+                <span style={{ fontSize: "15px", fontWeight: 700, color: "#0F172A", marginTop: "4px" }}>{card.title}</span>
+                <span style={{ fontSize: "12.5px", color: "#64748B", lineHeight: 1.4 }}>{card.description}</span>
+                <span
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    marginTop: "6px",
+                    fontSize: "13px",
+                    fontWeight: 600,
+                    color: card.color,
+                  }}
+                >
+                  View requests
+                  <ChevronRightRegular style={{ fontSize: "14px" }} />
+                </span>
+              </button>
+            ))}
+          </div>
+        ) : activeView === "handovers" ? (
+          <div style={{ background: "#FFFFFF", borderRadius: "20px", padding: "24px", border: "1px solid #E2E8F0" }}>
+            {loading ? (
+              <div style={{ display: "flex", justifyContent: "center", padding: "60px" }}>
+                <Spinner label="Loading your handover requests..." />
+              </div>
+            ) : handoverRequests.length === 0 ? (
+              <div
+                style={{
+                  textAlign: "center",
+                  padding: "48px",
+                  color: "#64748B",
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  gap: "12px",
+                }}
+              >
+                <ArrowSwapRegular style={{ fontSize: "40px", color: "#CBD5E1" }} />
+                <div style={{ fontWeight: 600, fontSize: "15px" }}>No handover requests found.</div>
+                <div style={{ fontSize: "13px" }}>Use “Request Handover” on My Assets to return equipment.</div>
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                {handoverRequests.map((req) => {
+                  const status = req.Status || "Pending";
+                  const statusColor =
+                    status === "Completed"
+                      ? { bg: "#ECFDF5", color: "#10B981", border: "#A7F3D0", label: "Completed" }
+                      : status === "Cancelled"
+                      ? { bg: "#F1F5F9", color: "#64748B", border: "#CBD5E1", label: "Cancelled" }
+                      : status === "InProgress"
+                      ? { bg: "#EFF6FF", color: "#2563EB", border: "#BFDBFE", label: "In Progress" }
+                      : { bg: "#FFFBEB", color: "#D97706", border: "#FDE68A", label: "Pending" };
+                  const canCancel = status === "Pending" && !(req.ActionedItemCount ?? 0);
+                  return (
+                    <div
+                      key={req.ID}
+                      style={{
+                        background: "#FFFFFF",
+                        border: "1px solid #E2E8F0",
+                        borderRadius: "16px",
+                        padding: "16px 24px",
+                        boxShadow: "0 1px 3px rgba(0, 0, 0, 0.02)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        flexWrap: "wrap",
+                        gap: "16px",
+                      }}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", gap: "16px", flex: "1 1 300px", minWidth: 0 }}>
+                        <div
+                          style={{
+                            width: "46px",
+                            height: "46px",
+                            borderRadius: "14px",
+                            background: "#EFF6FF",
+                            color: "#2563EB",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            fontSize: "22px",
+                            flexShrink: 0,
+                          }}
+                        >
+                          <ArrowSwapRegular />
+                        </div>
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
+                            <span style={{ fontSize: "15px", fontWeight: 700, color: "#1E293B" }}>
+                              {req.HandoverRequestID || req.ID}
+                            </span>
+                            <span
+                              style={{
+                                fontSize: "11px",
+                                fontWeight: 600,
+                                background: "#EFF6FF",
+                                color: "#2563EB",
+                                borderRadius: "6px",
+                                padding: "2px 7px",
+                              }}
+                            >
+                              {req.Reason || "Handover"}
+                            </span>
+                          </div>
+                          <div style={{ display: "flex", alignItems: "center", gap: "12px", marginTop: "4px", fontSize: "12.5px", color: "#64748B", flexWrap: "wrap" }}>
+                            <span style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}>
+                              <CalendarRegular style={{ fontSize: "13px" }} />
+                              {formatDate(req.CreatedAt)}
+                            </span>
+                            <span>•</span>
+                            <span>
+                              {req.ItemCount ?? 0} asset{req.ItemCount === 1 ? "" : "s"}
+                              {req.AssignedAdminName ? ` · Admin: ${req.AssignedAdminName}` : ""}
+                            </span>
+                          </div>
+                          {req.AdditionalNotes && (
+                            <div
+                              style={{
+                                marginTop: "4px",
+                                fontSize: "12px",
+                                color: "#94A3B8",
+                                maxWidth: "420px",
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                whiteSpace: "nowrap",
+                              }}
+                            >
+                              {req.AdditionalNotes}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                        <span
+                          style={{
+                            background: statusColor.bg,
+                            color: statusColor.color,
+                            border: `1px solid ${statusColor.border}`,
+                            borderRadius: "9999px",
+                            padding: "4px 14px",
+                            fontSize: "12.5px",
+                            fontWeight: 600,
+                            whiteSpace: "nowrap",
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "5px",
+                          }}
+                        >
+                          <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: statusColor.color }} />
+                          {statusColor.label}
+                        </span>
+                        {canCancel && (
+                          <button
+                            type="button"
+                            onClick={() => setCancelTarget({ kind: "handover", id: req.ID, label: req.HandoverRequestID || "Handover" })}
+                            style={cancelPillStyle}
+                          >
+                            <DismissRegular style={{ fontSize: "13px" }} />
+                            <span>Cancel</span>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        ) : activeView === "upgrades" ? (
           <div style={{ background: "#FFFFFF", borderRadius: "20px", padding: "24px", border: "1px solid #E2E8F0" }}>
             <UpgradeRequestList requests={upgradeRequests} role="employee" onActionComplete={loadData} />
           </div>
@@ -495,11 +883,24 @@ Generated on: ${new Date().toLocaleString()}
           </div>
         ) : activeView === "lost" ? (
           <div style={{ background: "#FFFFFF", borderRadius: "20px", padding: "24px", border: "1px solid #E2E8F0" }}>
+            {teamLostRequests.length > 0 && (
+              <div style={{ marginBottom: "16px" }}>
+                <QuadraPillToggle<"my" | "team">
+                  size="sm"
+                  options={[
+                    { key: "my", label: "My Asset Lost", count: lostRequests.length },
+                    { key: "team", label: "Team Asset Lost", count: teamLostRequests.length },
+                  ]}
+                  value={lostScope}
+                  onChange={(val) => setLostScope(val)}
+                />
+              </div>
+            )}
             {loading ? (
               <div style={{ display: "flex", justifyContent: "center", padding: "60px" }}>
                 <Spinner label="Loading lost asset reports..." />
               </div>
-            ) : lostRequests.length === 0 ? (
+            ) : visibleLostRequests.length === 0 ? (
               <div
                 style={{
                   textAlign: "center",
@@ -517,13 +918,16 @@ Generated on: ${new Date().toLocaleString()}
               </div>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-                {lostRequests.map((req) => {
+                {visibleLostRequests.map((req) => {
                   const statusColor =
                     req.RequestStatus === "Completed"
                       ? { bg: "#ECFDF5", color: "#10B981", border: "#A7F3D0", label: "Completed" }
+                      : req.RequestStatus === "Cancelled"
+                      ? { bg: "#F1F5F9", color: "#64748B", border: "#CBD5E1", label: "Cancelled" }
                       : req.RequestStatus === "InProgress"
                       ? { bg: "#EFF6FF", color: "#2563EB", border: "#BFDBFE", label: "In Progress" }
                       : { bg: "#FFFBEB", color: "#D97706", border: "#FDE68A", label: "Pending" };
+                  const canCancelLost = req.RequestStatus === "Pending";
                   return (
                     <div
                       key={req.ID}
@@ -589,6 +993,7 @@ Generated on: ${new Date().toLocaleString()}
                             </span>
                           </div>
                           <div style={{ marginTop: "4px", fontSize: "12px", color: "#94A3B8" }}>
+                            {lostScope === "team" && req.EmployeeName ? `${req.EmployeeName} · ` : ""}
                             {req.ItemCount} asset{req.ItemCount === 1 ? "" : "s"} reported
                             {req.ManagerName ? ` · Manager: ${req.ManagerName}` : ""}
                           </div>
@@ -622,6 +1027,16 @@ Generated on: ${new Date().toLocaleString()}
                           />
                           {statusColor.label}
                         </span>
+                        {canCancelLost && (
+                          <button
+                            type="button"
+                            onClick={() => setCancelTarget({ kind: "lost", id: req.ID, label: req.RequestNumber ?? "Lost report" })}
+                            style={cancelPillStyle}
+                          >
+                            <DismissRegular style={{ fontSize: "13px" }} />
+                            <span>Cancel</span>
+                          </button>
+                        )}
                       </div>
                     </div>
                   );
@@ -691,13 +1106,17 @@ Generated on: ${new Date().toLocaleString()}
 
               {/* Simplified Status Filter Tabs */}
               <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
-                {(["All", "Pending", "In Progress", "Approved", "Rejected"] as const).map((status) => {
+                {STATUS_FILTERS.map((status) => {
                   const isActive = statusFilter === status;
+                  const count = statusCounts[status] ?? 0;
                   return (
                     <button
                       key={status}
                       onClick={() => setStatusFilter(status)}
                       style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "6px",
                         border: "none",
                         background: isActive ? "#007ED5" : "#FFFFFF",
                         color: isActive ? "#FFFFFF" : "#64748B",
@@ -714,6 +1133,19 @@ Generated on: ${new Date().toLocaleString()}
                       }}
                     >
                       {status}
+                      <span
+                        style={{
+                          fontSize: "11px",
+                          fontWeight: 700,
+                          minWidth: "18px",
+                          padding: "1px 6px",
+                          borderRadius: "9999px",
+                          background: isActive ? "rgba(255, 255, 255, 0.25)" : "#F1F5F9",
+                          color: isActive ? "#FFFFFF" : "#64748B",
+                        }}
+                      >
+                        {count}
+                      </span>
                     </button>
                   );
                 })}
@@ -873,7 +1305,43 @@ Generated on: ${new Date().toLocaleString()}
                       </div>
 
                       {/* Right: Line-by-Line Actions (Check Status & View Details side by side) */}
-                      <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
+                        {(req.OverallStatus === "ManagerReprogress" || req.OverallStatus === "AdminReprogress") && (
+                          <button
+                            type="button"
+                            onClick={() => setRespondRequest(req)}
+                            title="Your reviewer asked for more information"
+                            style={{
+                              background: "#D97706",
+                              border: "none",
+                              borderRadius: "9999px",
+                              padding: "7px 16px",
+                              fontSize: "13px",
+                              fontWeight: 600,
+                              color: "#FFFFFF",
+                              cursor: "pointer",
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: "6px",
+                              boxShadow: "0 2px 6px rgba(217, 119, 6, 0.25)",
+                            }}
+                          >
+                            <ArrowClockwiseRegular style={{ fontSize: "14px" }} />
+                            <span>Respond</span>
+                          </button>
+                        )}
+                        {CANCELLABLE_ASSET_STATUSES.has(req.OverallStatus) && (
+                          <button
+                            type="button"
+                            onClick={() => setCancelTarget({ kind: "asset", id: req.ID, label: req.RequestNumber || req.AssetType })}
+                            style={cancelPillStyle}
+                            onMouseEnter={(e) => (e.currentTarget.style.background = "#FEF2F2")}
+                            onMouseLeave={(e) => (e.currentTarget.style.background = "#FFFFFF")}
+                          >
+                            <DismissRegular style={{ fontSize: "13px" }} />
+                            <span>Cancel</span>
+                          </button>
+                        )}
                         <button
                           onClick={() => setStatusTrackRequest(req)}
                           style={{
@@ -1345,6 +1813,23 @@ Generated on: ${new Date().toLocaleString()}
                 </div>
               </div>
 
+              {getStatusBadgeStyle(detailsRequest.OverallStatus).label === "Cancelled" && (
+                <div
+                  style={{
+                    background: "#F8FAFC",
+                    border: "1px solid #CBD5E1",
+                    borderRadius: "12px",
+                    padding: "12px 16px",
+                    fontSize: "13px",
+                    color: "#475569",
+                    lineHeight: 1.5,
+                  }}
+                >
+                  <strong style={{ color: "#0F172A" }}>You cancelled this request.</strong>
+                  {detailsRequest.CancellationReason ? ` Reason: ${detailsRequest.CancellationReason}` : ""}
+                </div>
+              )}
+
               {/* Modal Footer */}
               <div
                 style={{
@@ -1357,6 +1842,22 @@ Generated on: ${new Date().toLocaleString()}
                   width: "100%",
                 }}
               >
+                {CANCELLABLE_ASSET_STATUSES.has(detailsRequest.OverallStatus) && (
+                  <Button
+                    appearance="subtle"
+                    icon={<DismissRegular />}
+                    onClick={() =>
+                      setCancelTarget({
+                        kind: "asset",
+                        id: detailsRequest.ID,
+                        label: detailsRequest.RequestNumber || detailsRequest.AssetType,
+                      })
+                    }
+                    style={{ borderRadius: "8px", fontWeight: 600, color: "#DC2626", marginRight: "auto" }}
+                  >
+                    Cancel Request
+                  </Button>
+                )}
                 <Button
                   appearance="secondary"
                   onClick={() => setDetailsRequest(null)}
@@ -1384,6 +1885,24 @@ Generated on: ${new Date().toLocaleString()}
           )}
         </DialogSurface>
       </Dialog>
+
+      <AssetRequestDetailsPanel
+        open={!!respondRequest}
+        onOpenChange={(open) => !open && setRespondRequest(null)}
+        request={respondRequest}
+        role="employee"
+        onActionComplete={() => {
+          setRespondRequest(null);
+          loadData();
+        }}
+      />
+
+      <CancelRequestDialog
+        open={!!cancelTarget}
+        requestLabel={cancelTarget?.label}
+        onOpenChange={(open) => !open && setCancelTarget(null)}
+        onConfirm={handleConfirmCancel}
+      />
     </>
   );
 };

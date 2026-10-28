@@ -3,7 +3,7 @@ import { getStoredAuthToken } from "../../Auth/tokenStorage";
 
 const API_BASE_URL = `${import.meta.env.VITE_API_BASE_URL}/asset/handover-requests`;
 
-export type HandoverRequestStatus = "Pending" | "InProgress" | "Completed";
+export type HandoverRequestStatus = "Pending" | "InProgress" | "Completed" | "Cancelled";
 export type HandoverItemStatus = "Pending" | "Good condition" | "Damaged" | "Not Applicable" | "Removed" | "Collected";
 
 export const HANDOVER_ITEM_STATUS_OPTIONS: Exclude<HandoverItemStatus, "Pending">[] = [
@@ -187,3 +187,23 @@ export const adminReprogressHandoverRequest = async (
   }
 };
 
+
+export const getMyAssetHandoverRequests = async (requestedByUserId: string): Promise<AssetHandoverRequestRecord[]> => {
+  try {
+    const response = await axios.get<ApiResponse<AssetHandoverRequestRecord[]>>(API_BASE_URL, {
+      headers: getAuthHeaders(),
+      params: { requestedByUserId },
+    });
+    return response.data.data ?? [];
+  } catch (error) {
+    return handleAxiosError(error, "Failed to fetch handover requests");
+  }
+};
+
+export const cancelAssetHandoverRequest = async (requestId: string, actedByUserId: string, reason?: string): Promise<void> => {
+  try {
+    await axios.post(`${API_BASE_URL}/${requestId}/cancel`, { actedByUserId, reason }, { headers: getAuthHeaders() });
+  } catch (error) {
+    handleAxiosError(error, "Failed to cancel handover request");
+  }
+};

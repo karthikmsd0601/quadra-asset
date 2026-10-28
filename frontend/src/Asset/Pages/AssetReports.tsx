@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   Card,
   Button,
@@ -20,6 +20,12 @@ import {
   Toaster,
   useToastController,
   useId,
+  Dialog,
+  DialogSurface,
+  DialogBody,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
 } from "@fluentui/react-components";
 import {
   BoxRegular,
@@ -42,6 +48,8 @@ import {
   DismissCircleRegular,
   CheckmarkRegular,
   ArrowClockwiseRegular,
+  ChevronLeftRegular,
+  CalendarRegular,
 } from "@fluentui/react-icons";
 import { useSearchParams } from "react-router-dom";
 import { useAuth } from "../../Auth/AuthProvider";
@@ -54,6 +62,8 @@ import {
   getDepartmentAssignments,
   AssetReportsOverview,
   DepartmentAssignmentRecord,
+  getMonthlyPurchaseDetail,
+  MonthlyPurchaseDetailRecord,
 } from "../Services/AssetReportsService";
 import { getAdminAssetRequests, AssetUserRequestRecord } from "../Services/AssetInventoryService";
 import { getAssetUpgradeRequests, AssetUpgradeRequestRecord } from "../Services/AssetUpgradeRequestService";
@@ -130,6 +140,12 @@ const AssetReports: React.FC = () => {
   });
   const [overview, setOverview] = useState<AssetReportsOverview | null>(null);
   const [loading, setLoading] = useState(true);
+
+  // Monthly Purchases: which calendar year is shown, and the month drilled into.
+  const [reportYear, setReportYear] = useState(() => new Date().getFullYear());
+  const [monthDetail, setMonthDetail] = useState<{ label: string; year: number; month: number } | null>(null);
+  const [monthDetailRows, setMonthDetailRows] = useState<MonthlyPurchaseDetailRecord[]>([]);
+  const [monthDetailLoading, setMonthDetailLoading] = useState(false);
 
   // Branch selector state
   const [selectedBranch, setSelectedBranch] = useState<string>(() => {
@@ -315,10 +331,44 @@ const AssetReports: React.FC = () => {
     [filteredStockRows]
   );
 
-  const monthlyPurchasesDesc = useMemo(
-    () => (overview ? [...overview.monthlyPurchases].reverse() : []),
-    [overview]
-  );
+  // Years that have purchases, plus the current year, newest first.
+  const purchaseYears = useMemo(() => {
+    const years = new Set<number>([new Date().getFullYear()]);
+    (overview?.monthlyPurchases ?? []).forEach((m) => {
+      const y = Number(m.MonthLabel.slice(0, 4));
+      if (y) years.add(y);
+    });
+    return Array.from(years).sort((a, b) => b - a);
+  }, [overview]);
+
+  // All twelve months of the selected year (Jan → Dec), zero-filled.
+  const yearMonths = useMemo(() => {
+    const byLabel = new Map((overview?.monthlyPurchases ?? []).map((m) => [m.MonthLabel, m]));
+    return Array.from({ length: 12 }, (_, i) => {
+      const label = `${reportYear}-${String(i + 1).padStart(2, "0")}`;
+      return byLabel.get(label) ?? { MonthLabel: label, ITCount: 0, ITCost: 0, NonITCount: 0, NonITValue: 0 };
+    });
+  }, [overview, reportYear]);
+
+  const monthlyPurchasesDesc = useMemo(() => [...yearMonths].reverse(), [yearMonths]);
+
+  const openMonthDetail = (monthLabel: string) => {
+    const [y, m] = monthLabel.split("-").map(Number);
+    setMonthDetail({ label: monthLabelToDisplay(monthLabel), year: y, month: m });
+    setMonthDetailRows([]);
+    setMonthDetailLoading(true);
+    getMonthlyPurchaseDetail(y, m, selectedBranch)
+      .then(setMonthDetailRows)
+      .catch((err) =>
+        dispatchToast(
+          <Toast>
+            <ToastTitle>{err instanceof Error ? err.message : "Failed to load monthly purchase detail"}</ToastTitle>
+          </Toast>,
+          { intent: "error" }
+        )
+      )
+      .finally(() => setMonthDetailLoading(false));
+  };
 
   const filteredNewRequests = useMemo(() => {
     const term = insightSearch.trim().toLowerCase();
@@ -385,7 +435,9 @@ const AssetReports: React.FC = () => {
     }
   };
 
-  if (loading && !overview) {
+  // Until data arrives (or while it's being fetched) show the spinner, so the
+  // render below can rely on `overview` being present.
+  if (!overview && !loadError) {
     return (
       <div style={{ display: "flex", justifyContent: "center", padding: "80px" }}>
         <Spinner label="Loading reports..." />
@@ -393,7 +445,7 @@ const AssetReports: React.FC = () => {
     );
   }
 
-  if (loadError && !overview) {
+  if (!overview) {
     return (
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "80px", gap: "16px" }}>
         <Text weight="semibold" style={{ color: "#E11D48", fontSize: "16px" }}>
@@ -923,13 +975,50 @@ const AssetReports: React.FC = () => {
               gap: "18px",
             }}
           >
-            <div>
-              <Text weight="bold" size={400} style={{ display: "block", color: "#0f172a", fontSize: 16 }}>
-                Monthly Purchases & Spend List
-              </Text>
-              <Text size={200} style={{ color: "#64748b", display: "block", marginTop: "2px" }}>
-                Detailed ledger of monthly procurement counts, IT capital, and Non-IT expenditures.
-              </Text>
+            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "12px", flexWrap: "wrap" }}>
+              <div>
+                <Text weight="bold" size={400} style={{ display: "block", color: "#0f172a", fontSize: 16 }}>
+                  Monthly Purchases & Spend List
+                </Text>
+                <Text size={200} style={{ color: "#64748b", display: "block", marginTop: "2px" }}>
+                  Detailed ledger of monthly procurement counts, IT capital, and Non-IT expenditures. Click a month to see its assets.
+                </Text>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                {(
+                  [
+                    { dir: -1, label: "Previous year", icon: <ChevronLeftRegular />, disabled: reportYear <= purchaseYears[purchaseYears.length - 1] },
+                    { dir: 1, label: "Next year", icon: <ChevronRightRegular />, disabled: reportYear >= purchaseYears[0] },
+                  ] as const
+                ).map((b, i) => (
+                  <React.Fragment key={b.label}>
+                    {i === 1 && (
+                      <span style={{ fontSize: "14px", fontWeight: 700, color: "#0f172a", minWidth: "44px", textAlign: "center" }}>{reportYear}</span>
+                    )}
+                    <button
+                      type="button"
+                      aria-label={b.label}
+                      disabled={b.disabled}
+                      onClick={() => setReportYear((y) => y + b.dir)}
+                      style={{
+                        width: "30px",
+                        height: "30px",
+                        borderRadius: "8px",
+                        border: "1px solid #E2E8F0",
+                        background: "#FFFFFF",
+                        color: b.disabled ? "#CBD5E1" : "#334155",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        cursor: b.disabled ? "not-allowed" : "pointer",
+                        fontSize: "14px",
+                      }}
+                    >
+                      {b.icon}
+                    </button>
+                  </React.Fragment>
+                ))}
+              </div>
             </div>
 
             <div style={{ overflowX: "auto" }}>
@@ -957,7 +1046,27 @@ const AssetReports: React.FC = () => {
                 <tbody>
                   {monthlyPurchasesDesc.map((row) => (
                     <tr key={row.MonthLabel} style={{ borderBottom: "1px solid rgba(241, 245, 249, 0.9)" }}>
-                      <td style={{ padding: "12px", fontWeight: 600, color: "#0f172a" }}>{monthLabelToDisplay(row.MonthLabel)}</td>
+                      <td style={{ padding: "12px" }}>
+                        <button
+                          type="button"
+                          onClick={() => openMonthDetail(row.MonthLabel)}
+                          title="View assets purchased this month"
+                          style={{
+                            border: "none",
+                            background: "transparent",
+                            padding: 0,
+                            fontWeight: 700,
+                            fontSize: "inherit",
+                            fontFamily: "inherit",
+                            color: "#007ED5",
+                            cursor: "pointer",
+                            textDecoration: "underline",
+                            textUnderlineOffset: "3px",
+                          }}
+                        >
+                          {monthLabelToDisplay(row.MonthLabel)}
+                        </button>
+                      </td>
                       <td style={{ padding: "12px", color: "#334155" }}>{row.ITCount}</td>
                       <td style={{ padding: "12px", color: "#334155" }}>{formatCurrency(row.ITCost)}</td>
                       <td style={{ padding: "12px", color: "#334155" }}>{row.NonITCount}</td>
@@ -1009,8 +1118,8 @@ const AssetReports: React.FC = () => {
                 </div>
               </div>
               <div style={{ display: "flex", alignItems: "flex-end", gap: "8px", height: "160px", overflowX: "auto", paddingBottom: "8px" }}>
-                {overview.monthlyPurchases.map((m) => {
-                  const maxVal = Math.max(1, ...overview.monthlyPurchases.map((x) => x.ITCount + x.NonITCount));
+                {yearMonths.map((m) => {
+                  const maxVal = Math.max(1, ...yearMonths.map((x) => x.ITCount + x.NonITCount));
                   const itHeight = Math.round((m.ITCount / maxVal) * 100);
                   const nonItHeight = Math.round((m.NonITCount / maxVal) * 100);
                   return (
@@ -1853,7 +1962,7 @@ const AssetReports: React.FC = () => {
                                 flexShrink: 0,
                                 lineHeight: "1.2",
                                 background:
-                                  REQUEST_STATUS_COLOR[r.OverallStatus] === "warning" || REQUEST_STATUS_COLOR[r.OverallStatus] === "important"
+                                  REQUEST_STATUS_COLOR[r.OverallStatus] === "warning"
                                     ? "#FEF3C7"
                                     : REQUEST_STATUS_COLOR[r.OverallStatus] === "success"
                                     ? "#DCFCE7"
@@ -1861,7 +1970,7 @@ const AssetReports: React.FC = () => {
                                     ? "#FEE2E2"
                                     : "#E0F2FE",
                                 color:
-                                  REQUEST_STATUS_COLOR[r.OverallStatus] === "warning" || REQUEST_STATUS_COLOR[r.OverallStatus] === "important"
+                                  REQUEST_STATUS_COLOR[r.OverallStatus] === "warning"
                                     ? "#B45309"
                                     : REQUEST_STATUS_COLOR[r.OverallStatus] === "success"
                                     ? "#15803D"
@@ -1869,7 +1978,7 @@ const AssetReports: React.FC = () => {
                                     ? "#B91C1C"
                                     : "#0369A1",
                                 border: `1px solid ${
-                                  REQUEST_STATUS_COLOR[r.OverallStatus] === "warning" || REQUEST_STATUS_COLOR[r.OverallStatus] === "important"
+                                  REQUEST_STATUS_COLOR[r.OverallStatus] === "warning"
                                     ? "#FDE68A"
                                     : REQUEST_STATUS_COLOR[r.OverallStatus] === "success"
                                     ? "#BBF7D0"
@@ -2111,6 +2220,85 @@ const AssetReports: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Month drill-down: assets purchased in the clicked month */}
+      <Dialog open={!!monthDetail} onOpenChange={(_, d) => !d.open && setMonthDetail(null)}>
+        <DialogSurface mountNode={mountNode} style={{ borderRadius: "20px", width: "760px", maxWidth: "calc(100vw - 32px)" }}>
+          <DialogBody>
+            <DialogTitle>
+              <span style={{ display: "inline-flex", alignItems: "center", gap: "8px" }}>
+                <CalendarRegular style={{ color: "#007ED5" }} />
+                Assets purchased in {monthDetail?.label}
+                {selectedBranch !== "All Branches" ? ` · ${selectedBranch}` : ""}
+              </span>
+            </DialogTitle>
+            <DialogContent>
+              {monthDetailLoading ? (
+                <div style={{ display: "flex", justifyContent: "center", padding: "32px" }}>
+                  <Spinner label="Loading purchases..." />
+                </div>
+              ) : monthDetailRows.length === 0 ? (
+                <div style={{ padding: "32px", textAlign: "center", color: "#64748b", fontSize: "13px" }}>
+                  No assets were purchased in this month.
+                </div>
+              ) : (
+                <>
+                  <div style={{ display: "flex", gap: "16px", flexWrap: "wrap", marginBottom: "12px", fontSize: "12.5px", color: "#475569" }}>
+                    <span>
+                      <strong style={{ color: "#0f172a" }}>{monthDetailRows.length}</strong> asset{monthDetailRows.length === 1 ? "" : "s"}
+                    </span>
+                    <span>
+                      Total spend <strong style={{ color: "#007ED5" }}>{formatCurrency(monthDetailRows.reduce((s, r) => s + (r.Cost || 0), 0))}</strong>
+                    </span>
+                  </div>
+                  <div style={{ overflowX: "auto", maxHeight: "50vh", overflowY: "auto" }}>
+                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
+                      <thead>
+                        <tr style={{ borderBottom: "1px solid rgba(226, 232, 240, 0.9)" }}>
+                          {["Asset", "Category", "Type", "Vendor", "Purchased", "Cost"].map((h) => (
+                            <th
+                              key={h}
+                              style={{ textAlign: "left", padding: "8px 10px", fontSize: "11px", fontWeight: 600, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.03em", position: "sticky", top: 0, background: "#FFFFFF" }}
+                            >
+                              {h}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {monthDetailRows.map((r) => (
+                          <tr key={r.ID} style={{ borderBottom: "1px solid rgba(241, 245, 249, 0.9)" }}>
+                            <td style={{ padding: "10px" }}>
+                              <div style={{ fontWeight: 600, color: "#0f172a" }}>{r.AssetName}</div>
+                              <div style={{ fontSize: "11.5px", color: "#64748b" }}>{r.AssetTagID}</div>
+                            </td>
+                            <td style={{ padding: "10px", color: "#334155" }}>{r.Category || "—"}</td>
+                            <td style={{ padding: "10px" }}>
+                              <Badge appearance="tint" color={r.AssetKind === "Non-IT" ? "success" : "brand"} size="small">
+                                {r.AssetKind === "Non-IT" ? "Non-IT" : "IT"}
+                              </Badge>
+                            </td>
+                            <td style={{ padding: "10px", color: "#334155" }}>{r.VendorName || "—"}</td>
+                            <td style={{ padding: "10px", color: "#334155" }}>
+                              {r.PurchasedDate ? new Date(r.PurchasedDate).toLocaleDateString("en-IN") : "—"}
+                            </td>
+                            <td style={{ padding: "10px", fontWeight: 600, color: "#0f172a" }}>{formatCurrency(r.Cost || 0)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              )}
+            </DialogContent>
+            <DialogActions>
+              <Button appearance="secondary" onClick={() => setMonthDetail(null)}>
+                Close
+              </Button>
+            </DialogActions>
+          </DialogBody>
+        </DialogSurface>
+      </Dialog>
     </div>
   );
 };

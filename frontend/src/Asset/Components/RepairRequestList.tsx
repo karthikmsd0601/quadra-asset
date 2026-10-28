@@ -8,15 +8,18 @@ import {
   RepairRequestStatus,
   adminActionOnRepairRequest,
   adminReprogressRepairRequest,
+  cancelAssetRepairRequest,
 } from "../Services/AssetRepairRequestService";
 import RepairRequestDetailsPanel from "./RepairRequestDetailsPanel";
+import CancelRequestDialog from "./CancelRequestDialog";
 
-const STATUS_COLOR: Record<string, "warning" | "success" | "danger"> = {
+const STATUS_COLOR: Record<string, "warning" | "success" | "danger" | "subtle"> = {
   Pending: "warning",
   Approved: "success",
   Rejected: "danger",
   Unrepairable: "danger",
   "Re-Progress": "warning",
+  Cancelled: "subtle",
 };
 
 const STATUS_TABS_ALL: { label: string; value: RepairRequestStatus | "All" }[] = [
@@ -26,6 +29,7 @@ const STATUS_TABS_ALL: { label: string; value: RepairRequestStatus | "All" }[] =
   { label: "Approved", value: "Approved" },
   { label: "Rejected", value: "Rejected" },
   { label: "Unrepairable", value: "Unrepairable" },
+  { label: "Cancelled", value: "Cancelled" },
 ];
 
 const EMPLOYEE_STATUS_TABS: { label: string; value: string }[] = [
@@ -33,6 +37,7 @@ const EMPLOYEE_STATUS_TABS: { label: string; value: string }[] = [
   { label: "Pending", value: "Pending" },
   { label: "Approved", value: "Approved" },
   { label: "Rejected", value: "Rejected" },
+  { label: "Cancelled", value: "Cancelled" },
 ];
 
 const formatDate = (value: string | null) => (value ? new Date(value).toLocaleDateString("en-IN") : "-");
@@ -53,8 +58,32 @@ const RepairRequestList: React.FC<RepairRequestListProps> = ({ requests, role, o
   const [noteText, setNoteText] = useState("");
   const [activeTab, setActiveTab] = useState<string>("All");
   const [detailsRequest, setDetailsRequest] = useState<AssetRepairRequestRecord | null>(null);
+  const [cancelRequest, setCancelRequest] = useState<AssetRepairRequestRecord | null>(null);
+  const [detailsInitialDecision, setDetailsInitialDecision] = useState<"Unrepairable" | null>(null);
 
   const tabs = role === "employee" ? EMPLOYEE_STATUS_TABS : STATUS_TABS_ALL;
+
+  const handleCancel = async (reason: string) => {
+    if (!cancelRequest || !currentUser?.userID) return;
+    try {
+      await cancelAssetRepairRequest(cancelRequest.ID, currentUser.userID, reason);
+      dispatchToast(
+        <Toast>
+          <ToastTitle>Request cancelled</ToastTitle>
+        </Toast>,
+        { intent: "success" }
+      );
+      onActionComplete();
+    } catch (error) {
+      dispatchToast(
+        <Toast>
+          <ToastTitle>{error instanceof Error ? error.message : "Failed to cancel repair request"}</ToastTitle>
+        </Toast>,
+        { intent: "error" }
+      );
+      throw error;
+    }
+  };
 
   const statusTabCounts = useMemo(() => {
     const counts = { All: requests.length } as Record<string, number>;
@@ -62,6 +91,7 @@ const RepairRequestList: React.FC<RepairRequestListProps> = ({ requests, role, o
       counts["Pending"] = requests.filter((r) => ["Pending", "Re-Progress"].includes(r.RequestStatus)).length;
       counts["Approved"] = requests.filter((r) => r.RequestStatus === "Approved").length;
       counts["Rejected"] = requests.filter((r) => ["Rejected", "Unrepairable"].includes(r.RequestStatus)).length;
+      counts["Cancelled"] = requests.filter((r) => r.RequestStatus === "Cancelled").length;
     } else {
       STATUS_TABS_ALL.forEach((tab) => {
         if (tab.value === "All") return;
@@ -140,7 +170,7 @@ const RepairRequestList: React.FC<RepairRequestListProps> = ({ requests, role, o
     }
   };
 
-  const handleConfirmUnrepairable = async (request: AssetRepairRequestRecord, note: string) => {
+  const handleConfirmUnrepairable = async (request: AssetRepairRequestRecord, note: string, newAssetId?: string) => {
     if (!currentUser?.userID) return;
     if (!note.trim()) return;
     setActingId(request.ID);
@@ -151,12 +181,15 @@ const RepairRequestList: React.FC<RepairRequestListProps> = ({ requests, role, o
         currentUser.userID,
         currentUser.displayName,
         currentUser.email,
-        note.trim()
+        note.trim(),
+        newAssetId
       );
       dispatchToast(
         <Toast>
           <ToastTitle>
-            {result?.replacementRequestNumber
+            {newAssetId
+              ? "Asset retired — replacement assigned"
+              : result?.replacementRequestNumber
               ? `Asset retired — replacement request ${result.replacementRequestNumber} raised`
               : "Asset marked unrepairable"}
           </ToastTitle>
@@ -291,19 +324,31 @@ const RepairRequestList: React.FC<RepairRequestListProps> = ({ requests, role, o
                     <Text size={200} style={{ color: "#64748b" }}>
                       {formatDate(request.CreatedAt)}
                     </Text>
-                    {request.RequestStatus === "Re-Progress" ? (
-                      <Button
-                        appearance="primary"
-                        style={{ background: "#007ED5", borderColor: "#007ED5", borderRadius: "8px" }}
-                        onClick={() => setDetailsRequest(request)}
-                      >
-                        Respond →
-                      </Button>
-                    ) : (
-                      <Button appearance="subtle" style={{ color: "#007ED5", borderRadius: "8px" }} onClick={() => setDetailsRequest(request)}>
-                        View Details →
-                      </Button>
-                    )}
+                    <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                      {(request.RequestStatus === "Pending" || request.RequestStatus === "Re-Progress") && (
+                        <Button
+                          appearance="subtle"
+                          icon={<DismissCircleRegular />}
+                          style={{ color: "#DC2626", borderRadius: "8px" }}
+                          onClick={() => setCancelRequest(request)}
+                        >
+                          Cancel
+                        </Button>
+                      )}
+                      {request.RequestStatus === "Re-Progress" ? (
+                        <Button
+                          appearance="primary"
+                          style={{ background: "#007ED5", borderColor: "#007ED5", borderRadius: "8px" }}
+                          onClick={() => setDetailsRequest(request)}
+                        >
+                          Respond →
+                        </Button>
+                      ) : (
+                        <Button appearance="subtle" style={{ color: "#007ED5", borderRadius: "8px" }} onClick={() => setDetailsRequest(request)}>
+                          View Details →
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 </div>
               );
@@ -381,6 +426,16 @@ const RepairRequestList: React.FC<RepairRequestListProps> = ({ requests, role, o
                 Replacement requested: {request.ReplacementRequestNumber}
               </Text>
             )}
+            {request.HasPendingHandover && request.RequestStatus === "Pending" && (
+              <div style={{ display: "flex", alignItems: "center", gap: "6px", marginTop: "8px", flexWrap: "wrap" }}>
+                <Badge appearance="tint" color="warning" icon={<WarningRegular />}>
+                  Pending Handover
+                </Badge>
+                <Text size={200} style={{ color: "#B45309" }}>
+                  Approval blocked until resolved
+                </Text>
+              </div>
+            )}
 
             {!takingNote && (
               <div
@@ -416,9 +471,9 @@ const RepairRequestList: React.FC<RepairRequestListProps> = ({ requests, role, o
                       icon={<WarningRegular />}
                       disabled={acting}
                       onClick={() => {
-                        setNoteActionId(request.ID);
-                        setNoteActionType("Unrepairable");
-                        setNoteText("");
+                        // Retiring needs a replacement asset, which is picked in the details drawer.
+                        setDetailsInitialDecision("Unrepairable");
+                        setDetailsRequest(request);
                       }}
                     >
                       Unrepairable
@@ -438,7 +493,8 @@ const RepairRequestList: React.FC<RepairRequestListProps> = ({ requests, role, o
                     <Button
                       appearance="primary"
                       icon={acting ? <Spinner size="tiny" /> : <CheckmarkCircleRegular />}
-                      disabled={acting}
+                      disabled={acting || !!request.HasPendingHandover}
+                      title={request.HasPendingHandover ? "The employee has a pending handover — resolve it before approving this repair." : undefined}
                       onClick={() => handleApprove(request)}
                     >
                       Approve
@@ -500,7 +556,12 @@ const RepairRequestList: React.FC<RepairRequestListProps> = ({ requests, role, o
 
       <RepairRequestDetailsPanel
         open={!!detailsRequest}
-        onOpenChange={(isOpen) => !isOpen && setDetailsRequest(null)}
+        onOpenChange={(isOpen) => {
+          if (!isOpen) {
+            setDetailsRequest(null);
+            setDetailsInitialDecision(null);
+          }
+        }}
         request={detailsRequest}
         role={role}
         acting={!!detailsRequest && actingId === detailsRequest.ID}
@@ -514,9 +575,10 @@ const RepairRequestList: React.FC<RepairRequestListProps> = ({ requests, role, o
           await handleConfirmReject(detailsRequest, reason);
           setDetailsRequest(null);
         }}
-        onUnrepairable={async (note) => {
+        initialDecision={detailsInitialDecision ?? undefined}
+        onUnrepairable={async (note, newAssetId) => {
           if (!detailsRequest) return;
-          await handleConfirmUnrepairable(detailsRequest, note);
+          await handleConfirmUnrepairable(detailsRequest, note, newAssetId);
           setDetailsRequest(null);
         }}
         onReprogress={async (reason) => {
@@ -525,6 +587,12 @@ const RepairRequestList: React.FC<RepairRequestListProps> = ({ requests, role, o
           setDetailsRequest(null);
         }}
         onRespondComplete={onActionComplete}
+      />
+      <CancelRequestDialog
+        open={!!cancelRequest}
+        requestLabel={cancelRequest?.RequestNumber}
+        onOpenChange={(open) => !open && setCancelRequest(null)}
+        onConfirm={handleCancel}
       />
     </div>
   );

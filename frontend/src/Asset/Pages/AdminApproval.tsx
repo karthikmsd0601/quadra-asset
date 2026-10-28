@@ -90,10 +90,11 @@ const HANDOVER_STATUS_TABS: { label: string; value: HandoverRequestStatus | "All
   { label: "Completed", value: "Completed" },
 ];
 
-const HANDOVER_STATUS_COLOR: Record<HandoverRequestStatus, "warning" | "informative" | "success"> = {
+const HANDOVER_STATUS_COLOR: Record<HandoverRequestStatus, "warning" | "informative" | "success" | "subtle"> = {
   Pending: "warning",
   InProgress: "informative",
   Completed: "success",
+  Cancelled: "subtle",
 };
 
 const PAGE_SIZE = 10;

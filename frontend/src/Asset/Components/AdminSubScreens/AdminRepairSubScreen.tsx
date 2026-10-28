@@ -528,6 +528,25 @@ export const AdminRepairSubScreen: React.FC<AdminRepairSubScreenProps> = ({
                   >
                     {r.Problem || "Employee reported hardware fault requiring technical diagnostics."}
                   </div>
+                  {r.HasPendingHandover && r.RequestStatus === "Pending" && (
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "6px",
+                        flexWrap: "wrap",
+                        marginTop: "-6px",
+                        marginBottom: "14px",
+                        fontSize: "12px",
+                        color: "#B45309",
+                      }}
+                    >
+                      <Badge appearance="tint" color="warning" icon={<WarningRegular />}>
+                        Pending Handover
+                      </Badge>
+                      <span>Approval blocked until resolved</span>
+                    </div>
+                  )}
                 </div>
 
                 <div>
@@ -727,6 +746,11 @@ export const AdminRepairSubScreen: React.FC<AdminRepairSubScreenProps> = ({
                       >
                         {r.RequestStatus}
                       </Badge>
+                      {r.HasPendingHandover && r.RequestStatus === "Pending" && (
+                        <div style={{ fontSize: "10.5px", color: "#B45309", marginTop: "4px", whiteSpace: "nowrap" }}>
+                          Pending Handover · approval blocked
+                        </div>
+                      )}
                     </td>
                     <td style={{ padding: "14px 18px", textAlign: "right" }}>
                       <button

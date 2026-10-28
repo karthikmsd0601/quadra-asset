@@ -207,7 +207,7 @@ const HRRequestDetailsPanel: React.FC<HRRequestDetailsPanelProps> = ({
   const isCompleted = detail?.request.Status === "Completed";
   const isActionable = !isCompleted && !!detail?.request;
   const pendingItems = (detail?.items ?? []).filter((i) => i.Status === "Pending");
-  const fulfilledCount = (detail?.items ?? []).filter((i) => i.Status === "Completed" || i.Status === "Assigned").length;
+  const fulfilledCount = (detail?.items ?? []).filter((i) => i.Status === "Completed" || i.Status === "Approved").length;
 
   const handleDecisionSubmit = async () => {
     if (!currentUser?.userID || !detail?.request) return;

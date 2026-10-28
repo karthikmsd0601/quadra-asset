@@ -32,6 +32,7 @@ import {
   PersonAdd24Regular,
   Wrench24Regular,
   Dismiss24Regular,
+  AddRegular,
 } from "@fluentui/react-icons";
 import {
   Headphones,
@@ -211,14 +212,65 @@ const AdminDashboard: React.FC = () => {
             </Text>
           </div>
 
-          <button
-            className="quadra-btn-calendar"
-            onClick={() => setCalendarOpen(true)}
-            aria-label="Open calendar view"
-          >
-            <CalendarLtrRegular style={{ color: "#007ed5", fontSize: 18 }} />
-            <span>Calendar View</span>
-          </button>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+            {/* Same pill as the Asset Inventory "Add Asset" button */}
+            <button
+              id="btn-header-add-asset"
+              type="button"
+              onClick={() => setAddAssetOpen(true)}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "10px",
+                background: "#FFFFFF",
+                color: "#0f3d64",
+                borderRadius: "9999px",
+                border: "1px solid #E2E8F0",
+                padding: "4px 20px 4px 5px",
+                fontSize: "14px",
+                fontWeight: 600,
+                cursor: "pointer",
+                boxShadow: "0 2px 8px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04)",
+                transition: "all 0.18s cubic-bezier(0.16, 1, 0.3, 1)",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = "translateY(-1px)";
+                e.currentTarget.style.boxShadow = "0 4px 14px rgba(0, 0, 0, 0.09)";
+                e.currentTarget.style.borderColor = "#CBD5E1";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = "translateY(0)";
+                e.currentTarget.style.boxShadow = "0 2px 8px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04)";
+                e.currentTarget.style.borderColor = "#E2E8F0";
+              }}
+            >
+              <span
+                style={{
+                  width: "30px",
+                  height: "30px",
+                  borderRadius: "50%",
+                  background: "#007ED5",
+                  color: "#FFFFFF",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  boxShadow: "0 2px 6px rgba(0, 126, 213, 0.3)",
+                }}
+              >
+                <AddRegular style={{ fontSize: 16 }} />
+              </span>
+              <span>Add Asset</span>
+            </button>
+
+            <button
+              className="quadra-btn-calendar"
+              onClick={() => setCalendarOpen(true)}
+              aria-label="Open calendar view"
+            >
+              <CalendarLtrRegular style={{ color: "#007ed5", fontSize: 18 }} />
+              <span>Calendar View</span>
+            </button>
+          </div>
         </div>
 
         {/* In Stock Assets Card matching Admin Dashboard.png */}

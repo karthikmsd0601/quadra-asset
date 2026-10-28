@@ -12,7 +12,8 @@ export type UpgradeReqStatus =
   | "AdminApprovalPending"
   | "AdminReprogress"
   | "Completed"
-  | "Rejected";
+  | "Rejected"
+  | "Cancelled";
 
 export type UpgradeReprogressStatus = "Pending" | "Responded";
 
@@ -58,6 +59,7 @@ export interface AssetUpgradeRequestRecord {
   RequestedByID: string;
   RequestedByName: string | null;
   RequestedByEmail: string | null;
+  RequestedByDepartment?: string | null;
   RequestedDate: string | null;
 
   ManagerID: string | null;
@@ -157,12 +159,13 @@ export const managerActionOnUpgradeRequest = async (
   action: "Approve" | "Reject",
   actedByUserId: string,
   actedByName?: string,
-  actedByMail?: string
+  actedByMail?: string,
+  reason?: string
 ): Promise<void> => {
   try {
     await axios.post(
       `${API_BASE_URL}/${id}/manager-action`,
-      { action, actedByUserId, actedByName, actedByMail },
+      { action, actedByUserId, actedByName, actedByMail, reason },
       { headers: getAuthHeaders() }
     );
   } catch (error) {
@@ -176,12 +179,13 @@ export const adminActionOnUpgradeRequest = async (
   actedByUserId: string,
   actedByName?: string,
   actedByMail?: string,
+  reason?: string,
   isOverride?: boolean
 ): Promise<void> => {
   try {
     await axios.post(
       `${API_BASE_URL}/${id}/admin-action`,
-      { action, actedByUserId, actedByName, actedByMail, isOverride },
+      { action, actedByUserId, actedByName, actedByMail, reason, isOverride },
       { headers: getAuthHeaders() }
     );
   } catch (error) {
@@ -276,5 +280,13 @@ export const getUpgradeAdminReprogressHistory = async (id: string): Promise<Upgr
     return response.data.data ?? [];
   } catch (error) {
     return handleAxiosError(error, "Failed to fetch re-progress history");
+  }
+};
+
+export const cancelAssetUpgradeRequest = async (requestId: string, cancelledByUserId: string, reason?: string): Promise<void> => {
+  try {
+    await axios.post(`${API_BASE_URL}/${requestId}/cancel`, { cancelledByUserId, reason }, { headers: getAuthHeaders() });
+  } catch (error) {
+    handleAxiosError(error, "Failed to cancel request");
   }
 };

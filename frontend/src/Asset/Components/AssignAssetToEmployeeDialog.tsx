@@ -29,6 +29,7 @@ import {
   CalendarRegular,
 } from "@fluentui/react-icons";
 import AssetIcon from "./AssetIcon";
+import { RoleAllowanceStrip, useRoleAllowance } from "./RoleAllowance";
 import { useThemedMountNode } from "../../Common/useThemedMountNode";
 import {
   AssetInventoryRecord,
@@ -85,6 +86,9 @@ export const AssignAssetToEmployeeDialog: React.FC<AssignAssetToEmployeeDialogPr
   // Step 2: Asset Selection & Filtering
   const [assetSearch, setAssetSearch] = useState("");
   const [selectedAsset, setSelectedAsset] = useState<AssetInventoryRecord | null>(null);
+
+  // The recipient's Asset Role limits which categories they can receive.
+  const allowance = useRoleAllowance(selectedEmployee?.ID);
 
   // Step 3: Assignment Purpose & Notes
   const [purpose, setPurpose] = useState(ASSIGNMENT_PURPOSES[0]);
@@ -187,6 +191,12 @@ export const AssignAssetToEmployeeDialog: React.FC<AssignAssetToEmployeeDialogPr
     }
     if (!selectedAsset) {
       setError("Please select an available asset to assign");
+      setActiveStep(2);
+      return;
+    }
+    const blocked = allowance.blockReason(selectedAsset.Category);
+    if (blocked) {
+      setError(`${selectedEmployee.DisplayName} can't receive this ${selectedAsset.Category}: ${blocked}.`);
       setActiveStep(2);
       return;
     }
@@ -450,7 +460,7 @@ export const AssignAssetToEmployeeDialog: React.FC<AssignAssetToEmployeeDialogPr
                         gap: "14px",
                       }}
                     >
-                      <Avatar name={selectedEmployee.DisplayName} size={44} color="colorful" />
+                      <Avatar name={selectedEmployee.DisplayName} size={48} color="colorful" />
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                           <span style={{ fontWeight: 700, color: "#0F172A", fontSize: "14px" }}>
@@ -714,6 +724,8 @@ export const AssignAssetToEmployeeDialog: React.FC<AssignAssetToEmployeeDialogPr
                     </div>
                   )}
 
+                  {selectedEmployee && <RoleAllowanceStrip allowance={allowance} employeeName={selectedEmployee.DisplayName} />}
+
                   {/* Active Selected Asset Preview */}
                   {selectedAsset && (
                     <div
@@ -805,10 +817,13 @@ export const AssignAssetToEmployeeDialog: React.FC<AssignAssetToEmployeeDialogPr
                     ) : (
                       filteredAssets.map((asset) => {
                         const isSelected = selectedAsset?.ID === asset.ID;
+                        const blocked = allowance.loading ? null : allowance.blockReason(asset.Category);
                         return (
                           <div
                             key={asset.ID}
-                            onClick={() => setSelectedAsset(asset)}
+                            onClick={() => !blocked && setSelectedAsset(asset)}
+                            aria-disabled={!!blocked}
+                            title={blocked ?? undefined}
                             style={{
                               display: "flex",
                               alignItems: "center",
@@ -817,11 +832,12 @@ export const AssignAssetToEmployeeDialog: React.FC<AssignAssetToEmployeeDialogPr
                               borderRadius: "8px",
                               background: isSelected ? "#EFF6FF" : "#FFFFFF",
                               border: isSelected ? "1.5px solid #007ED5" : "1px solid #E2E8F0",
-                              cursor: "pointer",
+                              cursor: blocked ? "not-allowed" : "pointer",
+                              opacity: blocked ? 0.55 : 1,
                               transition: "all 0.15s ease",
                             }}
                             onMouseEnter={(e) => {
-                              if (!isSelected) e.currentTarget.style.borderColor = "#93C5FD";
+                              if (!isSelected && !blocked) e.currentTarget.style.borderColor = "#93C5FD";
                             }}
                             onMouseLeave={(e) => {
                               if (!isSelected) e.currentTarget.style.borderColor = "#E2E8F0";
@@ -855,15 +871,16 @@ export const AssignAssetToEmployeeDialog: React.FC<AssignAssetToEmployeeDialogPr
                             </div>
                             <span
                               style={{
-                                background: isSelected ? "#007ED5" : "#EFF6FF",
-                                color: isSelected ? "#FFFFFF" : "#007ED5",
+                                background: blocked ? "#F1F5F9" : isSelected ? "#007ED5" : "#EFF6FF",
+                                color: blocked ? "#64748B" : isSelected ? "#FFFFFF" : "#007ED5",
                                 fontSize: "11px",
                                 fontWeight: 700,
                                 padding: "4px 12px",
                                 borderRadius: "14px",
+                                whiteSpace: "nowrap",
                               }}
                             >
-                              {isSelected ? "Selected" : "Select"}
+                              {blocked === "Limit reached" ? "Limit reached" : blocked ? "Not in role" : isSelected ? "Selected" : "Select"}
                             </span>
                           </div>
                         );

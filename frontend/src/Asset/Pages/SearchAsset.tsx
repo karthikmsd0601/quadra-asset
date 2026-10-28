@@ -27,6 +27,7 @@ import {
   MenuPopover,
   MenuList,
   MenuItem,
+  MenuItemCheckbox,
 } from "@fluentui/react-components";
 import {
   ListRegular,
@@ -56,6 +57,9 @@ import {
   ArrowClockwiseRegular,
   CheckmarkRegular,
   OpenRegular,
+  TextDescriptionRegular,
+  TableSearchRegular,
+  CalendarLtrRegular,
 } from "@fluentui/react-icons";
 import { useThemedMountNode } from "../../Common/useThemedMountNode";
 import {
@@ -79,6 +83,31 @@ import { getEntraDepartments, EntraDepartment } from "../../Services/Department"
 import { getAllEntraUsers, EntraADUser } from "../../Services/EntraADUserService";
 import { getCategoryIcon } from "../Utils/categoryIcon";
 import { CANONICAL_BRANCHES, normalizeBranch } from "../../Common/EnterpriseConstants";
+
+const SEARCH_AS_OPTIONS = ["Contains", "Start with", "End with", "Exact"];
+
+// "Standard fields" searches everything below; the rest narrow the keyword match.
+const SEARCH_FIELD_OPTIONS = [
+  "Standard fields",
+  "Asset Name",
+  "Asset Tag ID",
+  "Brand",
+  "Description",
+  "Model",
+  "Serial No",
+  "Location",
+  "Custodian Name",
+  "Custodian Email",
+  "Purchased from",
+];
+
+const PAST_YEARS = Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 1 - i);
+
+const toDateInputValue = (d: Date | null | undefined) => {
+  if (!d) return "";
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+};
 
 interface EnterpriseFilterDropdownProps {
   label: string;
@@ -261,6 +290,7 @@ const SearchAssets: React.FC = () => {
   const [quickDateRange, setQuickDateRange] = useState("...");
   const [customStartDate, setCustomStartDate] = useState<Date | null>(null);
   const [customEndDate, setCustomEndDate] = useState<Date | null>(null);
+  const searchFieldsCustomized = !searchFields.includes("Standard fields");
 
   // Drawer state
   const [isPanelOpen, setIsPanelOpen] = useState(false);
@@ -473,7 +503,7 @@ const SearchAssets: React.FC = () => {
       const now = new Date();
       const thisYear = now.getFullYear();
       const thisMonth = now.getMonth();
-      const thisQuarter = Math.floor(thisMonth / 4);
+      const thisQuarter = Math.floor(thisMonth / 3);
 
       switch (quickDateRange) {
         case "Current Month":
@@ -485,27 +515,26 @@ const SearchAssets: React.FC = () => {
           effectiveEnd = new Date(thisYear, thisMonth, 0);
           break;
         case "Current Quarter":
-          effectiveStart = new Date(thisYear, thisQuarter * 4, 1);
-          effectiveEnd = new Date(thisYear, thisQuarter * 4 + 4, 0);
+          effectiveStart = new Date(thisYear, thisQuarter * 3, 1);
+          effectiveEnd = new Date(thisYear, thisQuarter * 3 + 3, 0);
+          break;
+        case "Previous Quarter":
+          effectiveStart = new Date(thisYear, (thisQuarter - 1) * 3, 1);
+          effectiveEnd = new Date(thisYear, thisQuarter * 3, 0);
           break;
         case "Current Year":
           effectiveStart = new Date(thisYear, 0, 1);
           effectiveEnd = new Date(thisYear, 11, 31);
           break;
-        case "Year 2025":
-          effectiveStart = new Date(2025, 0, 1);
-          effectiveEnd = new Date(2025, 11, 31);
+        default: {
+          const yearMatch = /^Year (\d{4})$/.exec(quickDateRange);
+          if (yearMatch) {
+            const y = Number(yearMatch[1]);
+            effectiveStart = new Date(y, 0, 1);
+            effectiveEnd = new Date(y, 11, 31);
+          }
           break;
-        case "Year 2024":
-          effectiveStart = new Date(2024, 0, 1);
-          effectiveEnd = new Date(2024, 11, 31);
-          break;
-        case "Year 2023":
-          effectiveStart = new Date(2023, 0, 1);
-          effectiveEnd = new Date(2023, 11, 31);
-          break;
-        default:
-          break;
+        }
       }
 
       if (customStartDate) effectiveStart = customStartDate;
@@ -1175,6 +1204,148 @@ Status         : OFFICIALLY CERTIFIED AND ACTIVE ON ENTERPRISE NETWORK
             </div>
           </div>
 
+          {/* Row 1b: keyword matching — how to match and which fields to search */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))", gap: 14 }}>
+            <EnterpriseFilterDropdown
+              label="Match Keyword As"
+              icon={<TextDescriptionRegular style={{ fontSize: 14, color: searchAs !== "Contains" ? "#007ED5" : "#64748B" }} />}
+              value={searchAs}
+              options={SEARCH_AS_OPTIONS.map((o) => ({ value: o, label: o }))}
+              onChange={(val) => setSearchAs(val)}
+              isDefault={(v) => v === "Contains"}
+            />
+
+            <div style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
+              <label
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  fontSize: "12px",
+                  fontWeight: 600,
+                  color: searchFieldsCustomized ? "#007ED5" : "#475569",
+                  marginBottom: "6px",
+                }}
+              >
+                <TableSearchRegular style={{ fontSize: 14, color: searchFieldsCustomized ? "#007ED5" : "#64748B" }} />
+                <span>Search Fields</span>
+              </label>
+              <Menu
+                checkedValues={{ fields: searchFields }}
+                onCheckedValueChange={(_, d) => {
+                  const next = d.checkedItems;
+                  const pickedStandard = next.includes("Standard fields") && !searchFields.includes("Standard fields");
+                  // "Standard fields" means everything; picking a specific field narrows the search.
+                  if (pickedStandard || next.length === 0) setSearchFields(["Standard fields"]);
+                  else setSearchFields(next.filter((f) => f !== "Standard fields"));
+                }}
+              >
+                <MenuTrigger disableButtonEnhancement>
+                  <button
+                    type="button"
+                    style={{
+                      height: 40,
+                      borderRadius: 10,
+                      border: `1px solid ${searchFieldsCustomized ? "#007ED5" : "#CBD5E1"}`,
+                      background: searchFieldsCustomized ? "#F0F7FF" : "#FFFFFF",
+                      boxShadow: searchFieldsCustomized ? "0 0 0 1px #007ED5" : "none",
+                      padding: "0 12px",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      gap: 8,
+                      fontSize: 13,
+                      fontWeight: 500,
+                      color: searchFieldsCustomized ? "#007ED5" : "#0F172A",
+                      cursor: "pointer",
+                      width: "100%",
+                      fontFamily: "inherit",
+                    }}
+                  >
+                    <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {searchFieldsCustomized ? searchFields.join(", ") : "Standard fields (all)"}
+                    </span>
+                    <ChevronDownRegular style={{ fontSize: 14, flexShrink: 0, color: "#64748B" }} />
+                  </button>
+                </MenuTrigger>
+                <MenuPopover>
+                  <MenuList>
+                    {SEARCH_FIELD_OPTIONS.map((f) => (
+                      <MenuItemCheckbox key={f} name="fields" value={f}>
+                        {f === "Standard fields" ? "Standard fields (all)" : f}
+                      </MenuItemCheckbox>
+                    ))}
+                  </MenuList>
+                </MenuPopover>
+              </Menu>
+            </div>
+
+            <EnterpriseFilterDropdown
+              label="Date Range By"
+              icon={<CalendarLtrRegular style={{ fontSize: 14, color: dateRangeBy !== "Purchase Date" ? "#007ED5" : "#64748B" }} />}
+              value={dateRangeBy}
+              options={[
+                { value: "Purchase Date", label: "Purchase Date" },
+                { value: "Date Created", label: "Date Created" },
+              ]}
+              onChange={(val) => setDateRangeBy(val)}
+              isDefault={(v) => v === "Purchase Date"}
+            />
+
+            <div style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
+              <label
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  fontSize: "12px",
+                  fontWeight: 600,
+                  color: customStartDate || customEndDate ? "#007ED5" : "#475569",
+                  marginBottom: "6px",
+                }}
+              >
+                <CalendarRegular style={{ fontSize: 14, color: customStartDate || customEndDate ? "#007ED5" : "#64748B" }} />
+                <span>Custom Date Range</span>
+              </label>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                {(
+                  [
+                    { value: customStartDate, set: setCustomStartDate, label: "From date", max: customEndDate },
+                    { value: customEndDate, set: setCustomEndDate, label: "To date", min: customStartDate },
+                  ] as const
+                ).map((d, i) => (
+                  <React.Fragment key={d.label}>
+                    {i === 1 && <span style={{ color: "#94A3B8", fontSize: 12 }}>→</span>}
+                    <input
+                      type="date"
+                      aria-label={d.label}
+                      value={toDateInputValue(d.value)}
+                      min={"min" in d ? toDateInputValue(d.min) : undefined}
+                      max={"max" in d ? toDateInputValue(d.max) : undefined}
+                      onChange={(e) => {
+                        d.set(e.target.value ? new Date(`${e.target.value}T00:00:00`) : null);
+                        if (e.target.value) setQuickDateRange("...");
+                      }}
+                      style={{
+                        flex: 1,
+                        minWidth: 0,
+                        height: 40,
+                        borderRadius: 10,
+                        border: `1px solid ${d.value ? "#007ED5" : "#CBD5E1"}`,
+                        background: d.value ? "#F0F7FF" : "#FFFFFF",
+                        padding: "0 8px",
+                        fontSize: 12.5,
+                        color: "#0F172A",
+                        fontFamily: "inherit",
+                        boxSizing: "border-box",
+                      }}
+                    />
+                  </React.Fragment>
+                ))}
+              </div>
+            </div>
+          </div>
+
           {/* Row 2: Branch, Category, Department, Status */}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))", gap: 14 }}>
             <EnterpriseFilterDropdown
@@ -1345,12 +1516,16 @@ Status         : OFFICIALLY CERTIFIED AND ACTIVE ON ENTERPRISE NETWORK
                 { value: "Current Month", label: "Current Month" },
                 { value: "Previous Month", label: "Previous Month" },
                 { value: "Current Quarter", label: "Current Quarter" },
+                { value: "Previous Quarter", label: "Previous Quarter" },
                 { value: "Current Year", label: "Current Year" },
-                { value: "Year 2025", label: "Year 2025" },
-                { value: "Year 2024", label: "Year 2024" },
-                { value: "Year 2023", label: "Year 2023" },
+                ...PAST_YEARS.map((y) => ({ value: `Year ${y}`, label: `Year ${y}` })),
               ]}
-              onChange={(val) => setQuickDateRange(val)}
+              onChange={(val) => {
+                setQuickDateRange(val);
+                // A quick range replaces any custom dates.
+                setCustomStartDate(null);
+                setCustomEndDate(null);
+              }}
               isDefault={(v) => v === "..."}
             />
 

@@ -316,15 +316,15 @@ const NewAssetRequest: React.FC = () => {
                   </label>
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "14px" }}>
                     {components.map((comp) => (
-                      <div key={comp.ComponentID}>
+                      <div key={comp.ComponentID ?? comp.ID}>
                         <label style={{ fontSize: "12.5px", color: "#64748B", fontWeight: 500, display: "block", marginBottom: "4px" }}>
                           {comp.ComponentName}
                         </label>
                         <input
                           type="text"
                           placeholder={`e.g. ${comp.DefaultSpec || "Required spec"}`}
-                          value={specValues[comp.ComponentID] || ""}
-                          onChange={(e) => setSpecValues({ ...specValues, [comp.ComponentID]: e.target.value })}
+                          value={specValues[comp.ComponentID ?? comp.ID] || ""}
+                          onChange={(e) => setSpecValues({ ...specValues, [comp.ComponentID ?? comp.ID]: e.target.value })}
                           style={{
                             width: "100%",
                             padding: "10px 14px",
