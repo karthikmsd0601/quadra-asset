@@ -8,6 +8,8 @@ import {
   Text,
   Badge,
   Textarea,
+  Dropdown,
+  Option,
   Spinner,
   Toast,
   ToastTitle,
@@ -43,6 +45,7 @@ import {
   DecisionSummaryCard,
   DecisionOptionDef,
 } from "./RequestDrawerComponents";
+import { getAvailableAssetsForCategory, AvailableAssetOption } from "../Services/AssetInventoryService";
 
 const formatDateTime = (value: string | null | undefined) =>
   value ? new Date(value).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" }) : "—";
@@ -63,7 +66,7 @@ const REPAIR_DECISION_OPTIONS: Record<RepairDecisionChoice, DecisionOptionDef> =
   Unrepairable: {
     kind: "Unrepairable",
     label: "Mark Beyond Repair (Unrepairable)",
-    description: "Decommission damaged device and automatically generate replacement request",
+    description: "Retire this asset and assign an in-stock replacement to the employee now",
     icon: <WarningRegular />,
     accent: "#7C3AED",
     iconBg: "#F5F3FF",
@@ -96,13 +99,14 @@ interface RepairRequestDetailsPanelProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   request: AssetRepairRequestRecord | null;
-  role?: "employee" | "admin";
+  role?: "employee" | "admin" | "manager";
   acting?: boolean;
   onApprove?: () => void;
   onReject?: (reason: string) => void;
-  onUnrepairable?: (note: string) => void;
+  onUnrepairable?: (note: string, newAssetId: string) => void;
   onReprogress?: (reason: string) => void;
   onRespondComplete?: () => void;
+  initialDecision?: RepairDecisionChoice;
   onActionComplete?: () => void;
 }
 
@@ -117,6 +121,7 @@ const RepairRequestDetailsPanel: React.FC<RepairRequestDetailsPanelProps> = ({
   onUnrepairable,
   onReprogress,
   onRespondComplete,
+  initialDecision,
   onActionComplete,
 }) => {
   const { currentUser } = useAuth();
@@ -128,6 +133,11 @@ const RepairRequestDetailsPanel: React.FC<RepairRequestDetailsPanelProps> = ({
   const [remarks, setRemarks] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Replacement picker for the Unrepairable decision
+  const [replacementOptions, setReplacementOptions] = useState<AvailableAssetOption[]>([]);
+  const [loadingReplacements, setLoadingReplacements] = useState(false);
+  const [replacementAssetId, setReplacementAssetId] = useState<string | null>(null);
+
   // Employee Reprogress State
   const needsEmployeeResponse = role === "employee" && request?.RequestStatus === "Re-Progress";
   const [pendingReprogress, setPendingReprogress] = useState<RepairAdminReprogressRecord | null>(null);
@@ -137,7 +147,7 @@ const RepairRequestDetailsPanel: React.FC<RepairRequestDetailsPanelProps> = ({
 
   useEffect(() => {
     if (open) {
-      setSelectedDecision("Approve");
+      setSelectedDecision(initialDecision ?? "Approve");
       setRemarks("");
       setPendingReprogress(null);
       setEmployeeResponse("");
@@ -149,6 +159,21 @@ const RepairRequestDetailsPanel: React.FC<RepairRequestDetailsPanelProps> = ({
         .catch(() => {});
     }
   }, [open, request?.ID, request?.RequestStatus, needsEmployeeResponse]);
+
+  // Load in-stock assets of the same category once the admin picks Unrepairable.
+  useEffect(() => {
+    if (!open || !request || selectedDecision !== "Unrepairable") return;
+    let active = true;
+    setReplacementAssetId(null);
+    setLoadingReplacements(true);
+    getAvailableAssetsForCategory(request.AssetCategory || "")
+      .then((rows) => active && setReplacementOptions(rows.filter((r) => r.ID !== request.AssetID)))
+      .catch(() => active && setReplacementOptions([]))
+      .finally(() => active && setLoadingReplacements(false));
+    return () => {
+      active = false;
+    };
+  }, [open, request?.ID, selectedDecision]);
 
   if (!request) return null;
 
@@ -182,8 +207,9 @@ const RepairRequestDetailsPanel: React.FC<RepairRequestDetailsPanelProps> = ({
           { intent: "success" }
         );
       } else if (selectedDecision === "Unrepairable") {
+        if (!replacementAssetId) return;
         if (onUnrepairable) {
-          onUnrepairable(remarks.trim());
+          onUnrepairable(remarks.trim(), replacementAssetId);
         } else {
           await adminActionOnRepairRequest(
             request.ID,
@@ -191,12 +217,13 @@ const RepairRequestDetailsPanel: React.FC<RepairRequestDetailsPanelProps> = ({
             currentUser.userID,
             currentUser.displayName,
             currentUser.email,
-            remarks.trim()
+            remarks.trim(),
+            replacementAssetId
           );
         }
         dispatchToast(
           <Toast>
-            <ToastTitle>Asset marked unrepairable. Replacement requested.</ToastTitle>
+            <ToastTitle>Asset retired and replacement assigned to {request.RequestedByName || "the employee"}.</ToastTitle>
           </Toast>,
           { intent: "success" }
         );
@@ -285,7 +312,9 @@ const RepairRequestDetailsPanel: React.FC<RepairRequestDetailsPanelProps> = ({
 
   const isSubmitDisabled =
     isActing ||
-    (selectedDecision !== "Approve" && !remarks.trim());
+    (selectedDecision !== "Approve" && !remarks.trim()) ||
+    (selectedDecision === "Unrepairable" && !replacementAssetId) ||
+    (selectedDecision === "Approve" && !!request.HasPendingHandover);
 
   const currentOptionDef = REPAIR_DECISION_OPTIONS[selectedDecision];
 
@@ -457,6 +486,23 @@ const RepairRequestDetailsPanel: React.FC<RepairRequestDetailsPanelProps> = ({
                 badgeLabel="Action Required"
               >
                 <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                  {request.HasPendingHandover && (
+                    <div
+                      style={{
+                        padding: "10px 12px",
+                        borderRadius: "10px",
+                        background: "#FFFBEB",
+                        border: "1px solid #FDE68A",
+                        color: "#92400E",
+                        fontSize: "12.5px",
+                        lineHeight: 1.5,
+                      }}
+                    >
+                      <strong>Pending Handover</strong> — {request.RequestedByName || "The employee"} has an open handover request. Approval is
+                      blocked until it is resolved; you can still reject or ask for more information.
+                    </div>
+                  )}
+
                   {/* Option 1: Approve */}
                   <OptionCard
                     def={REPAIR_DECISION_OPTIONS.Approve}
@@ -497,6 +543,37 @@ const RepairRequestDetailsPanel: React.FC<RepairRequestDetailsPanelProps> = ({
                     }}
                   />
                 </div>
+
+                {selectedDecision === "Unrepairable" && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: "6px", marginTop: "4px" }}>
+                    <label style={{ fontSize: "12px", fontWeight: 600, color: "#334155" }}>Replacement Asset *</label>
+                    {loadingReplacements ? (
+                      <Spinner size="tiny" label="Loading in-stock assets..." labelPosition="after" />
+                    ) : (
+                      <Dropdown
+                        placeholder="Select replacement asset..."
+                        value={replacementOptions.find((o) => o.ID === replacementAssetId)?.AssetName ?? ""}
+                        selectedOptions={replacementAssetId ? [replacementAssetId] : []}
+                        onOptionSelect={(_, d) => setReplacementAssetId(d.optionValue ?? null)}
+                      >
+                        {replacementOptions.length === 0 ? (
+                          <Option value="" text="No in-stock assets available" disabled>
+                            No in-stock assets available{request.AssetCategory ? ` for ${request.AssetCategory}` : ""}
+                          </Option>
+                        ) : (
+                          replacementOptions.map((o) => (
+                            <Option key={o.ID} value={o.ID} text={o.AssetName}>
+                              {o.AssetName} ({o.AssetTagID})
+                            </Option>
+                          ))
+                        )}
+                      </Dropdown>
+                    )}
+                    <Text size={200} style={{ color: "#64748B" }}>
+                      {request.AssetName} will be retired and unassigned; the replacement is assigned to {request.RequestedByName || "the employee"} immediately.
+                    </Text>
+                  </div>
+                )}
 
                 {/* Single Contextual Remarks/Instructions Field */}
                 <div style={{ display: "flex", flexDirection: "column", gap: "6px", marginTop: "4px" }}>

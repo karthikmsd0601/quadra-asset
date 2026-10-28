@@ -249,7 +249,7 @@ const AssetRequestDetailsPanel: React.FC<AssetRequestDetailsPanelProps> = ({
     role === "manager"
       ? request?.ManagerApprovalStatus === "Pending"
       : role === "admin"
-      ? request?.AdminApprovalStatus === "Pending"
+      ? request?.AdminApprovalStatus === "Pending" && request?.ManagerApprovalStatus !== "Rejected"
       : false;
 
   const pendingReprogress = reprogressHistory.find((r) => r.ReprogressStatus === "Pending");
@@ -619,10 +619,44 @@ const AssetRequestDetailsPanel: React.FC<AssetRequestDetailsPanelProps> = ({
             )}
           </>
         );
+      case "ManagerReprogress":
+      case "AdminReprogress":
+        return (
+          <Text size={200} style={{ color: "#B45309" }}>
+            Sent back to you for more information — awaiting your response.
+          </Text>
+        );
+      case "Cancelled":
+        return (
+          <>
+            <Text size={200} style={{ color: "#64748B" }}>
+              You cancelled this request.
+            </Text>
+            {request.CancellationReason && (
+              <Text size={200} style={{ display: "block", marginTop: "4px", color: "#605E5C" }}>
+                Reason: {request.CancellationReason}
+              </Text>
+            )}
+          </>
+        );
       default:
         return null;
     }
   };
+
+  // Context notes shown above a reviewer's decision area, matching the
+  // situations the approval workflow can be in when they open the request.
+  const reviewerNote: string | null = !request
+    ? null
+    : request.OverallStatus === "Cancelled"
+    ? "Cancelled by the requestor — no action is needed."
+    : role === "admin" && request.ManagerApprovalStatus === "Rejected" && request.AdminApprovalStatus === "Pending"
+    ? `No Action Required — the Manager already rejected this request${request.ManagerApprovedReason ? `: "${request.ManagerApprovedReason}"` : "."}`
+    : (request.ManagerApprovalStatus as string) === "Skipped"
+    ? "Manager approval skipped — per the requestor's Escalation Exception permission. This request went straight to Admin."
+    : (role === "manager" && request.OverallStatus === "ManagerReprogress") || (role === "admin" && request.OverallStatus === "AdminReprogress")
+    ? "Sent back to the requestor for more information — awaiting their response."
+    : null;
 
   const historyEntries: { key: string; who: string; reason: string | null; date: string | null; status: string; response: string | null }[] =
     historyDialogType === "manager"
@@ -929,6 +963,21 @@ const AssetRequestDetailsPanel: React.FC<AssetRequestDetailsPanelProps> = ({
                       gap: "16px",
                     }}
                   >
+                    {reviewerNote && (
+                      <div
+                        style={{
+                          padding: "10px 14px",
+                          borderRadius: "10px",
+                          background: "#FFFBEB",
+                          border: "1px solid #FDE68A",
+                          color: "#92400E",
+                          fontSize: "12.5px",
+                          lineHeight: 1.5,
+                        }}
+                      >
+                        {reviewerNote}
+                      </div>
+                    )}
                     {/* Header */}
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
                       <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>

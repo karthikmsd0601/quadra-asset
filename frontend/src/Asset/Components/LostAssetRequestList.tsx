@@ -32,10 +32,11 @@ import {
 import { getAvailableAssetsForCategory, AvailableAssetOption } from "../Services/AssetInventoryService";
 import { useAuth } from "../../Auth/AuthProvider";
 
-const STATUS_COLOR: Record<LostRequestStatus, "warning" | "informative" | "success"> = {
+const STATUS_COLOR: Record<LostRequestStatus, "warning" | "informative" | "success" | "subtle"> = {
   Pending: "warning",
   InProgress: "informative",
   Completed: "success",
+  Cancelled: "subtle",
 };
 
 const ITEM_STATUS_COLOR: Record<string, "warning" | "informative" | "success" | "danger"> = {

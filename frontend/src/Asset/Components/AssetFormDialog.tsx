@@ -296,7 +296,7 @@ const AssetFormDialog: React.FC<AssetFormDialogProps> = ({
       setCustomVendors((prev) => (prev.includes(val) ? prev : [...prev, val]));
       setPurchasedFrom(val);
       const matched = vendors.find((v) => v.VendorName?.toLowerCase() === val.toLowerCase());
-      handleChange("VendorID", matched ? matched.VendorID : null);
+      handleChange("VendorID", matched ? matched.ID : null);
     }
     setAddNewModal(null);
   };
@@ -478,7 +478,7 @@ const AssetFormDialog: React.FC<AssetFormDialogProps> = ({
                       }
                       setPurchasedFrom(d.optionValue || "");
                       const matched = vendors.find((v) => v.VendorName === d.optionValue);
-                      handleChange("VendorID", matched ? matched.VendorID : null);
+                      handleChange("VendorID", matched ? matched.ID : null);
                     }}
                     mountNode={mountNode}
                     placeholder="Select or enter Vendor"

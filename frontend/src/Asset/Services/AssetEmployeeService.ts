@@ -20,6 +20,12 @@ export interface DepartmentBreakdown {
   UserCount: number;
 }
 
+export interface AssetRoleAssignmentRow {
+  UserID: string;
+  RoleTemplateID: string;
+  RoleName: string;
+}
+
 export interface AssetModuleEmployeesResult {
   users: AssetModuleEmployee[];
   totalCount: number;
@@ -565,15 +571,25 @@ export const getAssetModuleEmployees = async (
       params: { page, limit, search: search || undefined, department: department || undefined },
       timeout: 2500,
     });
-    const data = response.data.data;
-    const users = [...(data?.users || [])];
-    
+    const data = response.data.data as (AssetModuleEmployeesResult & { roleAssignments?: AssetRoleAssignmentRow[] }) | undefined;
+    let users = [...(data?.users || [])];
+
     // Merge mock employees if missing or fewer items
     MOCK_EMPLOYEES.forEach((mockEmp) => {
       if (!users.some((u) => u.ID === mockEmp.ID || (u.Mail || "").toLowerCase() === (mockEmp.Mail || "").toLowerCase())) {
         users.push(mockEmp);
       }
     });
+
+    // The server's Asset Role assignments are authoritative for every user,
+    // including directory entries that only exist in the fallback list above.
+    if (data?.roleAssignments) {
+      const byUser = new Map(data.roleAssignments.map((a) => [a.UserID, a]));
+      users = users.map((u) => {
+        const assignment = byUser.get(u.ID);
+        return { ...u, AssetRole: assignment?.RoleTemplateID ?? null, AssetRoleName: assignment?.RoleName ?? null };
+      });
+    }
 
     let filtered = users;
     if (search?.trim()) {
@@ -688,6 +704,20 @@ export const getAssetTeamMembers = async (managerId: string): Promise<AssetTeamM
     // Fallback to mock team members
   }
   return MOCK_TEAM_MEMBERS;
+};
+
+// Server-recorded assignments only — no demo fallback. Used where an empty
+// result must stay empty, e.g. checking role allowances before reassigning.
+export const getUserAssignedAssetsStrict = async (userId: string): Promise<UserAssignedAsset[]> => {
+  try {
+    const response = await axios.get<ApiResponse<UserAssignedAsset[]>>(`${API_BASE_URL}/${userId}/assets`, {
+      headers: getAuthHeaders(),
+      timeout: 2500,
+    });
+    return response.data.data ?? [];
+  } catch (error) {
+    return handleAxiosError(error, "Failed to fetch assigned assets");
+  }
 };
 
 export const getUserAssignedAssets = async (userId: string): Promise<UserAssignedAsset[]> => {

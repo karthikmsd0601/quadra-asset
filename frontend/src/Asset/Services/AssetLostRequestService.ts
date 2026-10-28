@@ -3,7 +3,7 @@ import { getStoredAuthToken } from "../../Auth/tokenStorage";
 
 const API_BASE_URL = `${import.meta.env.VITE_API_BASE_URL}/asset/lost-requests`;
 
-export type LostRequestStatus = "Pending" | "InProgress" | "Completed";
+export type LostRequestStatus = "Pending" | "InProgress" | "Completed" | "Cancelled";
 export type LostRequestItemStatus = "PendingManagerApproval" | "Pending" | "Rejected" | "AwaitingReplacement" | "Replaced";
 export type LostRequestReportedByRole = "Employee" | "Manager" | "Admin";
 export type LostRequestManagerApprovalStatus = "Pending" | "Approved" | "Rejected";
@@ -36,6 +36,8 @@ export interface AssetLostRequestRecord {
   ManagerActionReason: string | null;
 
   RequestStatus: LostRequestStatus;
+  Department?: string | null;
+  PoliceReportFiled?: boolean | null;
   ItemCount: number;
   PendingItemCount: number;
 
@@ -51,6 +53,7 @@ export interface AssetLostRequestItemRecord {
   Category: string | null;
 
   ItemStatus: LostRequestItemStatus;
+  ResolutionNotes?: string | null;
   RejectionReason: string | null;
   ReplacementAssetID: string | null;
   ReplacementAssetName: string | null;
@@ -249,3 +252,11 @@ export const adminReprogressLostRequest = async (
   }
 };
 
+
+export const cancelAssetLostRequest = async (requestId: string, actedByUserId: string, reason?: string): Promise<void> => {
+  try {
+    await axios.post(`${API_BASE_URL}/${requestId}/cancel`, { actedByUserId, reason }, { headers: getAuthHeaders() });
+  } catch (error) {
+    handleAxiosError(error, "Failed to cancel lost asset request");
+  }
+};

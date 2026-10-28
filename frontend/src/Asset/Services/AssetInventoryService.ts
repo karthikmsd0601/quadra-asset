@@ -31,6 +31,7 @@ export interface AssetInventoryRecord {
   LocationName: string | null;
   Category: string;
   Site: string | null;
+  Branch?: string | null;
   AssetPhotoURL: AssetFileRef[];
   ExpireDate: string | null;
   VendorID: string | null;
@@ -89,6 +90,8 @@ export interface AssetCategoryRecord {
   ID: string;
   CategoryName: string;
   CategoryType: AssetCategoryType;
+  Description?: string | null;
+  AssetType?: string;
   IsActive?: boolean;
   CreatedAt?: string;
   CreatedBy?: string | null;
@@ -161,6 +164,7 @@ export interface AssetInventoryFormData {
   ExpireDate?: string | null;
   VendorID?: string | null;
   Status?: AssetStatus;
+  Department?: string | null;
 }
 
 interface ApiResponse<T> {
@@ -848,6 +852,7 @@ export const deleteAssetCategory = async (id: string, updatedByUserId: string): 
 export interface AppLocationOption {
   Id: string;
   Name: string;
+  LocationName?: string;
 }
 
 export const getAppLocations = async (): Promise<AppLocationOption[]> => {
@@ -919,7 +924,8 @@ export type RequestOverallStatus =
   | "AdminReprogress"
   | "PendingManagerApproval"
   | "PendingAdminApproval"
-  | "Completed";
+  | "Completed"
+  | "Cancelled";
 
 export interface AssetUserRequestRecord {
   ID: string;
@@ -959,6 +965,9 @@ export interface AssetUserRequestRecord {
   RequestedByJobTitle: string | null;
   RequestedByDepartment: string | null;
   OverallStatus: RequestOverallStatus;
+  CancellationReason?: string | null;
+  Category?: string | null;
+  CancelledAt?: string | null;
   ApprovedAt?: string | null;
   ApprovedByName?: string | null;
   ApprovalStatus?: string | null;
@@ -1241,5 +1250,14 @@ export const respondToAdminReprogress = async (
     });
   } catch (error) {
     handleAxiosError(error, "Failed to submit response");
+  }
+};
+
+// Requestor-initiated cancellation of an open asset request.
+export const cancelAssetRequest = async (requestId: string, cancelledByUserId: string, reason?: string): Promise<void> => {
+  try {
+    await axios.post(`${API_BASE_URL}/requests/${requestId}/cancel`, { cancelledByUserId, reason }, { headers: getAuthHeaders() });
+  } catch (error) {
+    handleAxiosError(error, "Failed to cancel request");
   }
 };

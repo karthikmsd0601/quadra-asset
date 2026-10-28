@@ -36,6 +36,17 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS activity (id TEXT PRIMARY KEY, title TEXT, detail TEXT, created_at TEXT NOT NULL);
 `);
 try { db.exec("ALTER TABLE employees ADD COLUMN branch TEXT DEFAULT 'Coimbatore'"); } catch {}
+try { db.exec("ALTER TABLE employees ADD COLUMN asset_role_id TEXT"); } catch {}
+try { db.exec("ALTER TABLE requests ADD COLUMN cancel_reason TEXT"); } catch {}
+try { db.exec("ALTER TABLE requests ADD COLUMN cancelled_at TEXT"); } catch {}
+try { db.exec("ALTER TABLE requests ADD COLUMN asset_id TEXT"); } catch {}
+try { db.exec("ALTER TABLE requests ADD COLUMN reported_by TEXT"); } catch {}
+db.exec(`
+  CREATE TABLE IF NOT EXISTS role_templates (id TEXT PRIMARY KEY, role_name TEXT NOT NULL, description TEXT, active INTEGER DEFAULT 1, created_at TEXT, created_by TEXT);
+  CREATE TABLE IF NOT EXISTS role_template_items (id TEXT PRIMARY KEY, role_id TEXT NOT NULL, category_id TEXT, category_name TEXT, quantity INTEGER DEFAULT 1);
+  CREATE TABLE IF NOT EXISTS asset_role_assignments (user_id TEXT PRIMARY KEY, role_id TEXT NOT NULL, assigned_at TEXT);
+  CREATE TABLE IF NOT EXISTS reprogress (id TEXT PRIMARY KEY, request_id TEXT NOT NULL, kind TEXT NOT NULL, reason TEXT, status TEXT DEFAULT 'Pending', actor_id TEXT, actor_name TEXT, actor_mail TEXT, response TEXT, responded_by TEXT, responded_at TEXT, created_at TEXT NOT NULL);
+`);
 
 // Normalize legacy branch and department strings in database
 try {
@@ -89,7 +100,10 @@ const first = (v, fallback = null) => (v === undefined ? fallback : v);
 const json = (res, data, status = 200, message) => res.status(status).json({ success: true, ...(message ? { message } : {}), data });
 const error = (res, message, status = 400) => res.status(status).json({ success: false, message });
 const body = (req) => req.body && typeof req.body === "object" ? req.body : {};
-const requestUser = (req) => body(req).requestedByUserId || body(req).createdByUserId || body(req).userId || "local-admin";
+const requestUser = (req) => {
+  const p = body(req);
+  return p.requestedByUserId || p.RequestedByUserID || p.employeeUserId || p.EmployeeUserID || p.reportedByUserId || p.createdByUserId || p.userId || p.actedByUserId || p.cancelledByUserId || "local-admin";
+};
 
 function seed() {
   const addEmployee = db.prepare("INSERT OR REPLACE INTO employees (id,display_name,email,employee_id,job_title,department,role,branch) VALUES (?,?,?,?,?,?,?,?)");
@@ -147,6 +161,29 @@ function seed() {
   addAsset.run("demo-nonit-002", "Herman Miller Aeron Chair", "Mineral Mesh, PostureFit SL, Size B", "QNonIT-000002", "Furniture", "Herman Miller", "Aeron Remastered", "HM-AER-02", "Chennai Suite Floor 2", "Chennai", 1395, "Assigned", "emp-sarah", "2026-08-22", "2031-08-22", "2026-08-22T10:00:00.000Z");
   addAsset.run("demo-nonit-003", "Epson PowerLite Conference Projector", "6000 lumens laser, WUXGA wireless", "QNonIT-000003", "Projector", "Epson", "EB-L630U", "EP-PRJ-03", "Bangalore Boardroom Alpha", "Bangalore", 2400, "In Stock", null, "2026-09-01", "2030-09-01", "2026-09-01T15:00:00.000Z");
 
+  // Asset Roles (role templates): per-category hardware allowances. Names match
+  // the roles the frontend's directory fallback already shows.
+  if (db.prepare("SELECT COUNT(*) AS n FROM role_templates").get().n === 0) {
+    const addRole = db.prepare("INSERT INTO role_templates (id,role_name,description,created_at,created_by) VALUES (?,?,?,?,?)");
+    const addItem = db.prepare("INSERT INTO role_template_items (id,role_id,category_id,category_name,quantity) VALUES (?,?,?,?,?)");
+    const roles = [
+      ["role-developer", "Developer", "Engineering workstation kit", [["cat-laptop", "Laptop", 1], ["cat-monitor", "Monitor", 2], ["cat-headphone", "Headphone", 1], ["cat-accessory", "Accessory", 1]]],
+      ["role-designer", "Designer", "Creative workstation kit", [["cat-laptop", "Laptop", 1], ["cat-monitor", "Monitor", 2], ["cat-accessory", "Accessory", 1]]],
+      ["role-team-lead", "Team Lead", "Lead kit with mobile access", [["cat-laptop", "Laptop", 1], ["cat-monitor", "Monitor", 1], ["cat-mobile", "Mobile", 1], ["cat-headphone", "Headphone", 1]]],
+      ["role-operations", "Operations Specialist", "Field and operations kit", [["cat-laptop", "Laptop", 1], ["cat-mobile", "Mobile", 1], ["cat-furniture", "Furniture", 1]]],
+      ["role-hr", "HR Specialist", "People team kit", [["cat-laptop", "Laptop", 1], ["cat-headphone", "Headphone", 1]]],
+      ["role-analyst", "Analyst", "Analyst kit", [["cat-laptop", "Laptop", 1], ["cat-monitor", "Monitor", 1]]],
+    ];
+    for (const [roleId, name, description, items] of roles) {
+      addRole.run(roleId, name, description, now(), "local-admin");
+      for (const [categoryId, categoryName, quantity] of items) addItem.run(id(), roleId, categoryId, categoryName, quantity);
+    }
+    const assign = db.prepare("INSERT OR IGNORE INTO asset_role_assignments (user_id,role_id,assigned_at) VALUES (?,?,?)");
+    [["emp-john", "role-developer"], ["emp-sarah", "role-operations"], ["emp-emily", "role-designer"], ["emp-alex", "role-developer"],
+     ["emp-priya", "role-hr"], ["emp-miracle", "role-developer"], ["emp-tatiana", "role-developer"], ["emp-alfonso", "role-designer"],
+     ["emp-dravid", "role-designer"], ["emp-michael", "role-analyst"]].forEach(([userId, roleId]) => assign.run(userId, roleId, now()));
+  }
+
   if (db.prepare("SELECT COUNT(*) AS n FROM requests").get().n === 0) {
     const addReq = db.prepare("INSERT INTO requests (id,request_number,type,requested_by,category,description,status,created_at) VALUES (?,?,?,?,?,?,?,?)");
     addReq.run("req-miracle-01", "REQ-2026-101", "New Asset", "emp-john", "Laptop", "High-performance development laptop with 32GB RAM", "Pending", now());
@@ -155,6 +192,17 @@ function seed() {
   }
 }
 seed();
+
+// HR onboarding requisitions so the HR dashboard has data on existing databases too.
+if (db.prepare("SELECT COUNT(*) AS n FROM requests WHERE type='HR'").get().n === 0) {
+  const addHr = db.prepare("INSERT INTO requests (id,request_number,type,requested_by,category,description,status,created_at,action_by) VALUES (?,?,?,?,?,?,?,?,?)");
+  [
+    ["HRREQ-000001", "emp-priya", "Laptop", "Onboarding kit for new AI engineer", "Pending", "2026-10-20T09:00:00.000Z"],
+    ["HRREQ-000002", "emp-priya", "Monitor", "Design hire workstation", "InProgress", "2026-10-14T09:00:00.000Z"],
+    ["HRREQ-000003", "emp-vikram", "Laptop", "Operations analyst joining Kochin", "Completed", "2026-09-30T09:00:00.000Z"],
+    ["HRREQ-000004", "emp-vikram", "Mobile", "Field sales onboarding", "Rejected", "2026-09-22T09:00:00.000Z"],
+  ].forEach(([num, by, cat, desc, status, at]) => addHr.run(id(), num, "HR", by, cat, desc, status, at, "local-admin"));
+}
 
 function assetRow(row) {
   if (!row) return null;
@@ -170,9 +218,24 @@ function assetRow(row) {
     AssignedToDepartment: assigned?.department || null, LostByUserID: null, LostByName: null, LostRequestNumber: null,
   };
 }
+function assetRoleFor(userId) {
+  return db.prepare("SELECT r.id, r.role_name FROM asset_role_assignments a JOIN role_templates r ON r.id=a.role_id WHERE a.user_id=? AND r.active=1").get(userId) || null;
+}
 function employeeRow(row) {
   if (!row) return null;
-  return { ID: row.id, DisplayName: row.display_name, Mail: row.email, EmployeeId: row.employee_id, JobTitle: row.job_title, Department: row.department, AssetRole: row.role, AssetRoleName: row.role, Branch: row.branch || "Coimbatore" };
+  const role = assetRoleFor(row.id);
+  return { ID: row.id, DisplayName: row.display_name, Mail: row.email, EmployeeId: row.employee_id, JobTitle: row.job_title, Department: row.department, AssetRole: role?.id || null, AssetRoleName: role?.role_name || null, Branch: row.branch || "Coimbatore" };
+}
+function roleItems(roleId) {
+  return db.prepare("SELECT id AS ID, category_id AS CategoryID, category_name AS CategoryName, quantity AS Quantity FROM role_template_items WHERE role_id=? ORDER BY category_name").all(roleId);
+}
+function roleTemplateRow(row) {
+  if (!row) return null;
+  return {
+    ID: row.id, RoleName: row.role_name, Description: row.description, CreatedAt: row.created_at, CreatedBy: row.created_by, ModifiedAt: null, ModifiedBy: null,
+    CategoryCount: db.prepare("SELECT COUNT(*) AS n FROM role_template_items WHERE role_id=?").get(row.id).n,
+    AssignedEmployeeCount: db.prepare("SELECT COUNT(*) AS n FROM asset_role_assignments WHERE role_id=?").get(row.id).n,
+  };
 }
 function requestRow(row) {
   if (!row) return null;
@@ -188,7 +251,9 @@ function requestRow(row) {
     "Admin Approved": { manager: "Approved", admin: "Approved", overall: "AdminApproved" },
     "Admin Rejected": { manager: "Approved", admin: "Rejected", overall: "AdminRejected" },
     "Admin Reprogress": { manager: "Approved", admin: "Re-Progress", overall: "AdminReprogress" },
+    Cancelled: { manager: "Cancelled", admin: "Cancelled", overall: "Cancelled" },
   };
+  const isCancelled = status === "Cancelled";
   const mapped = statusMap[status] || (row.type === "Asset" ? { manager: "Pending", admin: "Pending", overall: "ManagerPending" } : null);
   const managerStatus = mapped?.manager || (status === "Approved" || status === "Completed" ? "Approved" : status === "Rejected" ? "Rejected" : "Pending");
   const adminStatus = mapped?.admin || (status === "Approved" || status === "Completed" ? "Approved" : status === "Rejected" ? "Rejected" : "Pending");
@@ -208,15 +273,16 @@ function requestRow(row) {
     AssignedAdminID: row.action_by || "local-admin", AssignedAdminName: row.action_by ? (db.prepare("SELECT display_name FROM employees WHERE id=?").get(row.action_by)?.display_name || null) : "Local Asset Administrator",
     AssignedAdminMailID: "local.admin@localhost", ApprovedAdminID: adminStatus === "Approved" ? "local-admin" : null,
     ApprovedAdminName: adminStatus === "Approved" ? "Local Asset Administrator" : null, IsAdminOverride: false,
+    CancellationReason: row.cancel_reason || null, CancelledAt: row.cancelled_at || null, CancelledByUserID: isCancelled ? row.action_by || row.requested_by : null,
   };
   if (row.type === "Repair") {
-    const asset = requester ? db.prepare("SELECT * FROM assets WHERE assigned_to=? ORDER BY created_at DESC LIMIT 1").get(row.requested_by) : null;
-    return { ...common, AssetID: asset?.id || null, AssetName: asset?.asset_name || row.category || "Asset", AssetTagID: asset?.tag_id || null, IssueType: "Hardware fault", ProblemCategory: row.category || "General", Problem: row.description || "Repair required", AttachmentURL: [], RequestStatus: status === "Approved" ? "Approved" : status === "Rejected" ? "Rejected" : "Pending", AdminRejectionReason: null, ApprovedAdminID: status === "Approved" ? "local-admin" : null, ApprovedAdminName: status === "Approved" ? "Local Asset Administrator" : null, ApprovedDate: status === "Approved" ? row.created_at : null, ReplacementRequestID: null, ReplacementRequestNumber: null };
+    const asset = (row.asset_id ? db.prepare("SELECT * FROM assets WHERE id=? OR tag_id=?").get(row.asset_id, row.asset_id) : null) || (requester ? db.prepare("SELECT * FROM assets WHERE assigned_to=? ORDER BY created_at DESC LIMIT 1").get(row.requested_by) : null);
+    return { ...common, AssetID: asset?.id || null, AssetName: asset?.asset_name || row.category || "Asset", AssetTagID: asset?.tag_id || null, AssetCategory: asset?.category || null, HasPendingHandover: !!db.prepare("SELECT 1 FROM requests WHERE type='Handover' AND requested_by=? AND status IN ('Pending','InProgress') LIMIT 1").get(row.requested_by), IssueType: "Hardware fault", ProblemCategory: row.category || "General", Problem: row.description || "Repair required", AttachmentURL: [], RequestStatus: isCancelled ? "Cancelled" : status === "Approved" || status === "Admin Approved" ? "Approved" : status === "Rejected" || status === "Admin Rejected" ? "Rejected" : status === "Unrepairable" ? "Unrepairable" : status === "Admin Reprogress" ? "Re-Progress" : "Pending", AdminRejectionReason: null, ApprovedAdminID: status === "Approved" ? "local-admin" : null, ApprovedAdminName: status === "Approved" ? "Local Asset Administrator" : null, ApprovedDate: status === "Approved" ? row.created_at : null, ReplacementRequestID: null, ReplacementRequestNumber: null };
   }
-  if (row.type === "Upgrade") return { ...common, ComponentName: "Hardware", ComponentDisplayName: "Hardware", CurrentSpecification: "Current configuration", RequiredSpecfication: "Improved configuration", ReasonForUpgrade: row.description, ReqStatus: status === "Approved" ? "Completed" : status === "Rejected" ? "Rejected" : status === "Pending" ? "Pending" : status };
-  if (row.type === "HR") return { ...common, HRRequestID: row.request_number, RequestedUserName: requester?.display_name || null, RequestedUserMailID: requester?.email || null, AssignedAdminID: "local-admin", AssignedAdminName: "Local Asset Administrator", AssignedAdminMailID: "local.admin@localhost", ApplicantCount: 1, Status: status === "Pending" ? "Pending" : status };
-  if (row.type === "Handover") return { ...common, HandoverRequestID: row.request_number, RequestedUserName: requester?.display_name || null, RequestedUserMailID: requester?.email || null, Reason: row.category || "Other", AdditionalNotes: row.description, ItemCount: requester ? db.prepare("SELECT COUNT(*) AS n FROM assets WHERE assigned_to=?").get(row.requested_by).n : 0, ActionedItemCount: 0 };
-  if (row.type === "Lost") return { ...common, EmployeeUserID: row.requested_by, EmployeeName: requester?.display_name || null, EmployeeMail: requester?.email || null, ReportedByUserID: row.requested_by, ReportedByName: requester?.display_name || null, ReportedByMail: requester?.email || null, ReportedByRole: "Employee", LostDate: row.created_at, HowLost: row.category || "Unknown", AdditionalDetails: row.description, ManagerApprovalStatus: "Pending", RequestStatus: status === "Pending" ? "Pending" : status === "Approved" ? "Completed" : "InProgress", ItemCount: 1, PendingItemCount: 1 };
+  if (row.type === "Upgrade") return { ...common, ComponentName: "Hardware", ComponentDisplayName: "Hardware", CurrentSpecification: "Current configuration", RequiredSpecfication: "Improved configuration", ReasonForUpgrade: row.description, ReqStatus: ({ Approved: "Completed", "Admin Approved": "Completed", Completed: "Completed", Rejected: "Rejected", "Admin Rejected": "Rejected", "Manager Rejected": "ManagerRejected", "Manager Pending": "Pending", Pending: "Pending", "Admin Pending": "AdminApprovalPending", "Manager Reprogress": "ManagerReprogress", "Admin Reprogress": "AdminReprogress", Cancelled: "Cancelled" })[status] || status };
+  if (row.type === "HR") return { ...common, HRRequestID: row.request_number, Department: requester?.department || null, RequestedUserID: row.requested_by, RequestedUserName: requester?.display_name || null, RequestedUserMailID: requester?.email || null, AssignedAdminID: "local-admin", AssignedAdminName: "Local Asset Administrator", AssignedAdminMailID: "local.admin@localhost", ApplicantCount: 1, Status: status === "Pending" ? "Pending" : status };
+  if (row.type === "Handover") return { ...common, HandoverRequestID: row.request_number, RequestedUserID: row.requested_by, RequestedUserName: requester?.display_name || null, RequestedUserMailID: requester?.email || null, Reason: row.category || "Other", AdditionalNotes: row.description, RequestStatus: isCancelled ? "Cancelled" : status, Status: isCancelled ? "Cancelled" : status, ItemCount: requester ? db.prepare("SELECT COUNT(*) AS n FROM assets WHERE assigned_to=?").get(row.requested_by).n : 0, ActionedItemCount: 0 };
+  if (row.type === "Lost") { const reporter = row.reported_by ? db.prepare("SELECT * FROM employees WHERE id=?").get(row.reported_by) : null; return { ...common, EmployeeUserID: row.requested_by, EmployeeName: requester?.display_name || null, EmployeeMail: requester?.email || null, ReportedByUserID: reporter?.id || row.requested_by, ReportedByName: reporter?.display_name || requester?.display_name || null, ReportedByMail: reporter?.email || requester?.email || null, ReportedByRole: reporter && reporter.id !== row.requested_by ? (reporter.role === "Administrator" ? "Admin" : "Manager") : "Employee", LostDate: row.created_at, HowLost: row.category || "Unknown", AdditionalDetails: row.description, ManagerApprovalStatus: isCancelled ? "Cancelled" : "Pending", RequestStatus: isCancelled ? "Cancelled" : status === "Pending" ? "Pending" : status === "Approved" ? "Completed" : "InProgress", ItemCount: 1, PendingItemCount: isCancelled ? 0 : 1 }; }
   return common;
 }
 function nextTag() {
@@ -226,7 +292,9 @@ function nextTag() {
 function createRequest(type, payload) {
   const requestId = id();
   const number = `${type.slice(0, 3).toUpperCase()}-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`;
-  db.prepare("INSERT INTO requests (id,request_number,type,requested_by,category,description,status,created_at) VALUES (?,?,?,?,?,?,?,?)").run(requestId, number, type, requestUser({ body: () => payload }), payload.category || payload.Category || null, payload.description || payload.Description || null, "Pending", now());
+  const category = payload.category || payload.Category || payload.categoryName || payload.CategoryName || payload.assetType || payload.AssetType || payload.reason || payload.Reason || payload.howLost || payload.HowLost || null;
+  const description = payload.description || payload.Description || payload.purposeOfRequest || payload.PurposeOfRequest || payload.reasonForUpgrade || payload.problem || payload.additionalNotes || payload.additionalDetails || null;
+  db.prepare("INSERT INTO requests (id,request_number,type,requested_by,category,description,status,created_at,asset_id,reported_by) VALUES (?,?,?,?,?,?,?,?,?,?)").run(requestId, number, type, requestUser({ body: payload }), category, description, "Pending", now(), payload.assetId || payload.AssetID || (Array.isArray(payload.assetIds) ? payload.assetIds[0] : null) || null, payload.reportedByUserId || null);
   db.prepare("INSERT INTO activity (id,title,detail,created_at) VALUES (?,?,?,?)").run(id(), `${type} request created`, number, now());
   return requestRow(db.prepare("SELECT * FROM requests WHERE id=?").get(requestId));
 }
@@ -434,10 +502,12 @@ function requestCollection(type) {
   return {
     list: (req,res) => {
       let rows=db.prepare("SELECT * FROM requests WHERE type=? ORDER BY created_at DESC").all(type);
-      const userId=String(req.query.userId||"").trim();
+      const userId=String(req.query.userId||req.query.employeeId||req.query.requestedByUserId||"").trim();
+      const reportedBy=String(req.query.reportedByUserId||"").trim();
       const managerId=String(req.query.managerId||"").trim();
       const adminId=String(req.query.adminId||"").trim();
       if(userId) rows=rows.filter(r=>r.requested_by===userId);
+      if(reportedBy) rows=rows.filter(r=>(r.reported_by||r.requested_by)===reportedBy);
       if(managerId) rows=rows.filter(r=>["Pending","Manager Pending","Manager Reprogress"].includes(r.status));
       if(adminId) rows=rows.filter(r=>["Admin Pending","Admin Reprogress","Pending","InProgress"].includes(r.status));
       json(res, rows.map(requestRow));
@@ -458,12 +528,48 @@ function requestCollection(type) {
       if (assignedAssetId && row?.requested_by) {
         db.prepare("UPDATE assets SET assigned_to=?,status='Assigned' WHERE id=? OR tag_id=?").run(row.requested_by, assignedAssetId, assignedAssetId);
       }
+      // Unrepairable repair: retire the broken asset and hand the requestor the chosen replacement.
+      if (type === "Repair" && rawStatus === "Unrepairable" && row?.requested_by) {
+        const broken = requestRow(row)?.AssetID;
+        if (broken) db.prepare("UPDATE assets SET status='End of Use',assigned_to=NULL WHERE id=?").run(broken);
+        if (p.newAssetId) db.prepare("UPDATE assets SET assigned_to=?,status='Assigned' WHERE id=? AND status='In Stock'").run(row.requested_by, p.newAssetId);
+        db.prepare("INSERT INTO activity (id,title,detail,created_at) VALUES (?,?,?,?)").run(id(), "Asset retired and replaced", row.request_number, now());
+      }
       return json(res, row ? requestRow(row) : { id: req.params.id, status }); 
     },
     create: (req, res) => {
       const p = body(req);
       const created = createRequest(type, p);
       return json(res, created, 201);
+    },
+    // Reviewer sends the request back to the requestor for more information.
+    reprogress: (kind) => (req, res) => {
+      const row = db.prepare("SELECT * FROM requests WHERE id=? OR request_number=?").get(req.params.id, req.params.id);
+      if (!row) return error(res, "Request not found", 404);
+      const p = body(req);
+      const reason = String(p.reason || p.Reason || "").trim();
+      if (!reason) return error(res, "A reason is required to send this request back");
+      const actor = p.actedByUserId || "local-admin";
+      db.prepare("INSERT INTO reprogress (id,request_id,kind,reason,status,actor_id,actor_name,actor_mail,created_at) VALUES (?,?,?,?,?,?,?,?,?)")
+        .run(id(), row.id, kind, reason, "Pending", actor, p.actedByName || null, p.actedByMail || null, now());
+      db.prepare("UPDATE requests SET status=?,action_by=? WHERE id=?").run(kind === "manager" ? "Manager Reprogress" : "Admin Reprogress", actor, row.id);
+      return json(res, requestRow(db.prepare("SELECT * FROM requests WHERE id=?").get(row.id)), 200, "Request sent back for more information");
+    },
+    reprogressHistory: (kind) => (req, res) => {
+      const rows = db.prepare("SELECT * FROM reprogress WHERE request_id=? AND kind=? ORDER BY created_at DESC").all(req.params.id, kind);
+      json(res, rows.map(reprogressRow));
+    },
+    // Requestor-initiated cancellation. Only open requests can be cancelled;
+    // anything already completed, rejected or cancelled is left untouched.
+    cancel: (req, res) => {
+      const row = db.prepare("SELECT * FROM requests WHERE id=? OR request_number=?").get(req.params.id, req.params.id);
+      if (!row) return error(res, "Request not found", 404);
+      const closed = ["Cancelled", "Completed", "Approved", "Admin Approved", "Rejected", "Admin Rejected", "Manager Rejected"];
+      if (closed.includes(row.status)) return error(res, `This request is already ${row.status.toLowerCase()} and can no longer be cancelled.`, 409);
+      const p = body(req);
+      db.prepare("UPDATE requests SET status='Cancelled',action_by=?,cancel_reason=?,cancelled_at=? WHERE id=?").run(requestUser(req), p.reason || p.Reason || null, now(), row.id);
+      db.prepare("INSERT INTO activity (id,title,detail,created_at) VALUES (?,?,?,?)").run(id(), `${type} request cancelled`, row.request_number, now());
+      return json(res, requestRow(db.prepare("SELECT * FROM requests WHERE id=?").get(row.id)), 200, "Request cancelled");
     },
   };
 }
@@ -575,10 +681,42 @@ for (const [pathName,type] of [["requests","Asset"],["hr-requests","HR"],["repai
   const c=requestCollection(type);
   app.get(`/asset/${pathName}`, c.list); app.post(`/asset/${pathName}`, c.create);
   if (pathName !== "hr-requests" && pathName !== "handover-requests") app.get(`/asset/${pathName}/:id`, c.detail);
-  app.post(`/asset/${pathName}/:id/manager-action`, c.action); app.post(`/asset/${pathName}/:id/admin-action`, c.action); app.post(`/asset/${pathName}/:id/manager-reprogress`, c.action); app.post(`/asset/${pathName}/:id/admin-reprogress`, c.action);
-  app.post(`/asset/${pathName}/:id/attachments`, (_req,res)=>json(res,[])); app.get(`/asset/${pathName}/:id/reprogress`, (_req,res)=>json(res,[])); app.get(`/asset/${pathName}/:id/admin-reprogress`, (_req,res)=>json(res,[]));
+  app.post(`/asset/${pathName}/:id/cancel`, c.cancel);
+  app.post(`/asset/${pathName}/:id/manager-action`, c.action); app.post(`/asset/${pathName}/:id/admin-action`, c.action);
+  app.post(`/asset/${pathName}/:id/manager-reprogress`, c.reprogress("manager")); app.post(`/asset/${pathName}/:id/admin-reprogress`, c.reprogress("admin"));
+  app.post(`/asset/${pathName}/:id/attachments`, (_req,res)=>json(res,[]));
+  // Repair requests only ever go back from Admin, so their plain history is the admin one.
+  app.get(`/asset/${pathName}/:id/reprogress`, c.reprogressHistory(type === "Repair" ? "admin" : "manager"));
+  app.get(`/asset/${pathName}/:id/admin-reprogress`, c.reprogressHistory("admin"));
+  app.post(`/asset/${pathName}/reprogress/:rid/respond`, respondToReprogress);
+  app.post(`/asset/${pathName}/admin-reprogress/:rid/respond`, respondToReprogress);
 }
-app.get("/asset/requests/reprogress/:id/respond", (_req,res)=>json(res,[])); app.post("/asset/requests/reprogress/:id/respond", (_req,res)=>json(res,{})); app.post("/asset/requests/admin-reprogress/:id/respond", (_req,res)=>json(res,{}));
+
+// The requestor answers a send-back; the request returns to whoever asked.
+function respondToReprogress(req, res) {
+  const rec = db.prepare("SELECT * FROM reprogress WHERE id=?").get(req.params.rid);
+  if (!rec) return error(res, "Re-progress record not found", 404);
+  if (rec.status !== "Pending") return error(res, "This request has already been answered", 409);
+  const p = body(req);
+  db.prepare("UPDATE reprogress SET status='Responded',response=?,responded_by=?,responded_at=? WHERE id=?")
+    .run(p.EmployeeResponse || p.employeeResponse || p.response || null, p.respondedByUserId || null, now(), rec.id);
+  const row = db.prepare("SELECT * FROM requests WHERE id=?").get(rec.request_id);
+  if (row) {
+    const next = rec.kind === "manager" ? "Manager Pending" : row.type === "Repair" ? "Pending" : "Admin Pending";
+    db.prepare("UPDATE requests SET status=? WHERE id=?").run(next, row.id);
+    if (p.Problem || p.problem) db.prepare("UPDATE requests SET description=? WHERE id=?").run(p.Problem || p.problem, row.id);
+  }
+  json(res, row ? requestRow(db.prepare("SELECT * FROM requests WHERE id=?").get(row.id)) : null, 200, "Response submitted");
+}
+function reprogressRow(r) {
+  return {
+    ID: r.id, RequestID: r.request_id, ReprogressStatus: r.status, ReprogressedDate: r.created_at, CreatedAt: r.created_at,
+    ReprogressSubmitBy: r.responded_by || null, EmployeeResponse: r.response || null,
+    ReprogressedManagerID: r.kind === "manager" ? r.actor_id : null, ReprogressedManagerName: r.kind === "manager" ? r.actor_name : null, ReprogressedManagerMail: r.kind === "manager" ? r.actor_mail : null,
+    ReprogressedAdminID: r.kind === "admin" ? r.actor_id : null, ReprogressedAdminName: r.kind === "admin" ? r.actor_name : null, ReprogressedAdminMail: r.kind === "admin" ? r.actor_mail : null,
+    ManagerReason: r.kind === "manager" ? r.reason : null, AdminReason: r.kind === "admin" ? r.reason : null,
+  };
+}
 
 // Employees and related local lookup data
 app.get("/asset/employees", (req,res)=>{
@@ -590,12 +728,15 @@ app.get("/asset/employees", (req,res)=>{
   const totalCount=db.prepare("SELECT COUNT(*) AS n FROM employees WHERE active=1").get().n;
   const page=Math.max(1,Number(req.query.page||1)); const limit=Math.max(1,Math.min(100,Number(req.query.limit||100)));
   const paged=rows.slice((page-1)*limit,page*limit);
-  json(res,{users:paged.map(employeeRow),totalCount,filteredCount:rows.length,departments:[...new Set(rows.map(r=>r.department).filter(Boolean))].map(Department=>({Department,UserCount:rows.filter(r=>r.department===Department).length}))});
+  // roleAssignments also covers directory users that only exist in the
+  // frontend's fallback list, so their Asset Role stays in sync after edits.
+  const roleAssignments=db.prepare("SELECT a.user_id AS UserID, r.id AS RoleTemplateID, r.role_name AS RoleName FROM asset_role_assignments a JOIN role_templates r ON r.id=a.role_id WHERE r.active=1").all();
+  json(res,{users:paged.map(employeeRow),roleAssignments,totalCount,filteredCount:rows.length,departments:[...new Set(rows.map(r=>r.department).filter(Boolean))].map(Department=>({Department,UserCount:rows.filter(r=>r.department===Department).length}))});
 });
 app.get("/asset/employees/:userId", (req,res)=>{
   const row = db.prepare("SELECT * FROM employees WHERE id=?").get(req.params.userId)
-    || db.prepare("SELECT * FROM employees WHERE employee_id=?").get(req.params.userId)
-    || db.prepare("SELECT * FROM employees WHERE active=1 LIMIT 1").get();
+    || db.prepare("SELECT * FROM employees WHERE employee_id=?").get(req.params.userId);
+  if (!row) return error(res, "Employee not found", 404);
   json(res, employeeRow(row));
 });
 app.get("/asset/employees/:userId/assets", (req,res)=>{
@@ -649,7 +790,7 @@ app.get("/asset/reports", (req,res)=>{
   const repair=db.prepare(`SELECT COUNT(*) n FROM assets WHERE status='Under Maintenance' ${bFilter}`).get(...bParam).n;
   const itCount=db.prepare(`SELECT COUNT(*) n FROM assets a LEFT JOIN categories c ON c.id=a.category_id WHERE COALESCE(c.type,CASE WHEN a.category='Furniture' THEN 'Non-IT' ELSE 'IT' END)='IT' ${hasBranch ? " AND COALESCE(a.site, a.location, 'Coimbatore') LIKE '%' || ? || '%' " : ""}`).get(...bParam).n;
   const nonItCount=total.n-itCount;
-  const monthlyPurchases=db.prepare(`SELECT substr(purchased_date,1,7) AS month, SUM(CASE WHEN COALESCE(c.type,CASE WHEN a.category='Furniture' THEN 'Non-IT' ELSE 'IT' END)='IT' THEN 1 ELSE 0 END) AS it_count, SUM(CASE WHEN COALESCE(c.type,CASE WHEN a.category='Furniture' THEN 'Non-IT' ELSE 'IT' END)='IT' THEN COALESCE(a.cost,0) ELSE 0 END) AS it_cost, SUM(CASE WHEN COALESCE(c.type,CASE WHEN a.category='Furniture' THEN 'Non-IT' ELSE 'IT' END)='Non-IT' THEN 1 ELSE 0 END) AS non_it_count, SUM(CASE WHEN COALESCE(c.type,CASE WHEN a.category='Furniture' THEN 'Non-IT' ELSE 'IT' END)='Non-IT' THEN COALESCE(a.cost,0) ELSE 0 END) AS non_it_value FROM assets a LEFT JOIN categories c ON c.id=a.category_id WHERE purchased_date IS NOT NULL ${hasBranch ? " AND COALESCE(a.site, a.location, 'Coimbatore') LIKE '%' || ? || '%' " : ""} GROUP BY substr(purchased_date,1,7) ORDER BY month DESC LIMIT 12`).all(...bParam);
+  const monthlyPurchases=db.prepare(`SELECT substr(purchased_date,1,7) AS month, SUM(CASE WHEN COALESCE(c.type,CASE WHEN a.category='Furniture' THEN 'Non-IT' ELSE 'IT' END)='IT' THEN 1 ELSE 0 END) AS it_count, SUM(CASE WHEN COALESCE(c.type,CASE WHEN a.category='Furniture' THEN 'Non-IT' ELSE 'IT' END)='IT' THEN COALESCE(a.cost,0) ELSE 0 END) AS it_cost, SUM(CASE WHEN COALESCE(c.type,CASE WHEN a.category='Furniture' THEN 'Non-IT' ELSE 'IT' END)='Non-IT' THEN 1 ELSE 0 END) AS non_it_count, SUM(CASE WHEN COALESCE(c.type,CASE WHEN a.category='Furniture' THEN 'Non-IT' ELSE 'IT' END)='Non-IT' THEN COALESCE(a.cost,0) ELSE 0 END) AS non_it_value FROM assets a LEFT JOIN categories c ON c.id=a.category_id WHERE purchased_date IS NOT NULL ${hasBranch ? " AND COALESCE(a.site, a.location, 'Coimbatore') LIKE '%' || ? || '%' " : ""} GROUP BY substr(purchased_date,1,7) ORDER BY month DESC`).all(...bParam);
   const stockStatusSummary=db.prepare(`SELECT CASE WHEN COALESCE(c.type,CASE WHEN a.category='Furniture' THEN 'Non-IT' ELSE 'IT' END)='Non-IT' THEN 'Non-IT' ELSE 'IT' END AS asset_kind,a.category,COALESCE(a.site, a.location, 'Coimbatore') AS branch,a.status,COUNT(*) AS asset_count,COALESCE(SUM(a.cost),0) AS total_cost FROM assets a LEFT JOIN categories c ON c.id=a.category_id WHERE 1=1 ${hasBranch ? " AND COALESCE(a.site, a.location, 'Coimbatore') LIKE '%' || ? || '%' " : ""} GROUP BY asset_kind,a.category,branch,a.status ORDER BY asset_kind,a.category,branch,a.status`).all(...bParam);
   const canonicalDepartments = [
     "Operations",
@@ -724,6 +865,16 @@ app.get("/asset/reports", (req,res)=>{
   const branchRows = Array.from(branchMap.values()).sort((a, b) => b.total_assets - a.total_assets);
   json(res,{kpi:{TotalAssetValue:total.value,AssetsAssignedCount:assigned,AvailableStockCount:available,UnderRepairCount:repair,TotalITAssetCount:itCount,TotalNonITAssetCount:nonItCount},monthlyPurchases:monthlyPurchases.map(r=>({MonthLabel:r.month,ITCount:r.it_count||0,ITCost:r.it_cost||0,NonITCount:r.non_it_count||0,NonITValue:r.non_it_value||0})),stockStatusSummary:stockStatusSummary.map(r=>({AssetKind:r.asset_kind,CategoryName:r.category,Branch:r.branch,Status:r.status,AssetCount:r.asset_count,TotalCost:r.total_cost})),assignmentByDepartment:assignmentByDepartment.map(r=>({Department:r.Department,AssignedCount:r.AssignedCount})),requestVolume,branchDistribution:branchRows});
 });
+// Assets bought in one calendar month (drill-down from the Monthly Purchases table).
+app.get("/asset/reports/monthly-purchase-detail", (req,res)=>{
+  const year=Number(req.query.year), month=Number(req.query.month);
+  if(!year || !month || month<1 || month>12) return error(res,"year and month are required");
+  const branch=String(req.query.branch||"").trim();
+  const hasBranch = branch && branch !== "All" && branch !== "All Branches";
+  const prefix=`${year}-${String(month).padStart(2,"0")}`;
+  const rows=db.prepare(`SELECT a.*, COALESCE(c.type,CASE WHEN a.category='Furniture' THEN 'Non-IT' ELSE 'IT' END) AS asset_kind FROM assets a LEFT JOIN categories c ON c.id=a.category_id WHERE substr(a.purchased_date,1,7)=? ${hasBranch ? "AND COALESCE(a.site, a.location, 'Coimbatore') LIKE '%' || ? || '%'" : ""} ORDER BY a.purchased_date DESC`).all(...(hasBranch?[prefix,branch]:[prefix]));
+  json(res, rows.map(r=>({ ...assetRow(r), AssetKind: r.asset_kind })));
+});
 app.get("/asset/reports/department-assignments", (req,res)=>{
   const rawDepartment=String(req.query.department||"").trim();
   const branch=String(req.query.branch||"").trim();
@@ -746,6 +897,17 @@ app.get("/asset/reports/department-assignments", (req,res)=>{
 // this ordering Express treats "mismatches" and "category-usage" as IDs and
 // returns an object where the React screens expect arrays/usage metadata.
 app.get("/asset/role-templates/category-usage/:userId", (req,res)=>{
+  const assignment = db.prepare("SELECT r.id, r.role_name FROM asset_role_assignments a JOIN role_templates r ON r.id=a.role_id WHERE a.user_id=? AND r.active=1").get(req.params.userId);
+  if (assignment) {
+    const held = db.prepare("SELECT category, COUNT(*) AS n FROM assets WHERE assigned_to=? GROUP BY category").all(req.params.userId);
+    const pending = db.prepare("SELECT category, COUNT(*) AS n FROM requests WHERE type='Asset' AND requested_by=? AND status IN ('Pending','Manager Pending','Manager Reprogress','Admin Pending','Admin Reprogress') GROUP BY category").all(req.params.userId);
+    const count = (rows, name) => rows.find(r => String(r.category || "").toLowerCase() === name.toLowerCase())?.n || 0;
+    const items = roleItems(assignment.id).map(i => {
+      const HeldCount = count(held, i.CategoryName), PendingCount = count(pending, i.CategoryName);
+      return { CategoryID: i.CategoryID, CategoryName: i.CategoryName, RoleQuantity: i.Quantity, HeldCount, PendingCount, Remaining: Math.max(0, i.Quantity - HeldCount - PendingCount) };
+    });
+    return json(res, { roleTemplateId: assignment.id, roleName: assignment.role_name, items });
+  }
   // The local demo account is intentionally given a small, visible allowance
   // so the request flow can be exercised without a production role-template
   // store. Other users keep the real empty-state response.
@@ -760,13 +922,60 @@ app.get("/asset/role-templates/mismatches", (_req,res)=>{
 app.get("/asset/role-templates/mismatches/details", (_req,res)=>json(res,[]));
 app.get("/asset/role-templates/mismatches/user/:userId", (_req,res)=>json(res,[]));
 app.post("/asset/role-templates/mismatches/return-all", (_req,res)=>json(res,{returnedCount:0}));
-app.get("/asset/role-templates", (_req,res)=>json(res,[]));
-app.get("/asset/role-templates/:id", (_req,res)=>json(res,{template:null,items:[]}));
-app.post("/asset/role-templates", (req,res)=>json(res,{ID:id(),...body(req)},201));
-app.put("/asset/role-templates/:id", (req,res)=>json(res,{ID:req.params.id,...body(req)}));
-app.delete("/asset/role-templates/:id", (_req,res)=>json(res,null));
-app.post("/asset/role-templates/assign", (req,res)=>json(res,{}));
-app.post("/asset/role-templates/bulk-assign", (_req,res)=>json(res,{updatedCount:0}));
+app.get("/asset/role-templates/max-quantity", (_req,res)=>json(res,{maxQuantity:5}));
+app.get("/asset/role-templates", (_req,res)=>json(res,db.prepare("SELECT * FROM role_templates WHERE active=1 ORDER BY role_name").all().map(roleTemplateRow)));
+app.get("/asset/role-templates/:id", (req,res)=>{
+  const row=db.prepare("SELECT * FROM role_templates WHERE id=? AND active=1").get(req.params.id);
+  if(!row) return error(res,"Asset role not found",404);
+  const { CategoryCount, AssignedEmployeeCount, ...template } = roleTemplateRow(row);
+  json(res,{template,items:roleItems(row.id)});
+});
+function saveRoleItems(roleId, items) {
+  db.prepare("DELETE FROM role_template_items WHERE role_id=?").run(roleId);
+  const add=db.prepare("INSERT INTO role_template_items (id,role_id,category_id,category_name,quantity) VALUES (?,?,?,?,?)");
+  for(const item of Array.isArray(items)?items:[]){
+    const categoryId=item.categoryId||item.CategoryID||null;
+    const name=item.categoryName||item.CategoryName||(categoryId?db.prepare("SELECT name FROM categories WHERE id=?").get(categoryId)?.name:null)||"Other";
+    add.run(id(),roleId,categoryId,name,Math.max(1,Number(item.quantity||item.Quantity||1)));
+  }
+}
+app.post("/asset/role-templates", (req,res)=>{
+  const p=body(req); const name=String(p.roleName||p.RoleName||"").trim();
+  if(!name) return error(res,"Role name is required");
+  if(db.prepare("SELECT 1 FROM role_templates WHERE active=1 AND LOWER(role_name)=LOWER(?)").get(name)) return error(res,"An asset role with this name already exists",409);
+  const roleId=id();
+  db.prepare("INSERT INTO role_templates (id,role_name,description,created_at,created_by) VALUES (?,?,?,?,?)").run(roleId,name,p.description||p.Description||null,now(),p.createdBy||p.createdByUserId||"local-admin");
+  saveRoleItems(roleId,p.items||p.Items);
+  json(res,roleTemplateRow(db.prepare("SELECT * FROM role_templates WHERE id=?").get(roleId)),201);
+});
+app.put("/asset/role-templates/:id", (req,res)=>{
+  const p=body(req);
+  db.prepare("UPDATE role_templates SET role_name=COALESCE(?,role_name),description=COALESCE(?,description) WHERE id=?").run(p.roleName||p.RoleName||null,p.description??p.Description??null,req.params.id);
+  if(p.items||p.Items) saveRoleItems(req.params.id,p.items||p.Items);
+  json(res,roleTemplateRow(db.prepare("SELECT * FROM role_templates WHERE id=?").get(req.params.id)));
+});
+app.delete("/asset/role-templates/:id", (req,res)=>{
+  db.prepare("UPDATE role_templates SET active=0 WHERE id=?").run(req.params.id);
+  db.prepare("DELETE FROM asset_role_assignments WHERE role_id=?").run(req.params.id);
+  json(res,null,200,"Asset role deleted");
+});
+function setAssetRole(userId, roleId) {
+  if(!roleId) return db.prepare("DELETE FROM asset_role_assignments WHERE user_id=?").run(userId);
+  db.prepare("INSERT INTO asset_role_assignments (user_id,role_id,assigned_at) VALUES (?,?,?) ON CONFLICT(user_id) DO UPDATE SET role_id=excluded.role_id,assigned_at=excluded.assigned_at").run(userId,roleId,now());
+}
+app.post("/asset/role-templates/assign", (req,res)=>{
+  const p=body(req);
+  if(!p.userId) return error(res,"userId is required");
+  if(p.roleTemplateId && !db.prepare("SELECT 1 FROM role_templates WHERE id=? AND active=1").get(p.roleTemplateId)) return error(res,"Asset role not found",404);
+  setAssetRole(p.userId,p.roleTemplateId||null);
+  json(res,{userId:p.userId,roleTemplateId:p.roleTemplateId||null},200,"Asset role updated");
+});
+app.post("/asset/role-templates/bulk-assign", (req,res)=>{
+  const p=body(req); const ids=Array.isArray(p.userIds)?p.userIds:[];
+  if(p.roleTemplateId && !db.prepare("SELECT 1 FROM role_templates WHERE id=? AND active=1").get(p.roleTemplateId)) return error(res,"Asset role not found",404);
+  ids.forEach(u=>setAssetRole(u,p.roleTemplateId||null));
+  json(res,{updatedCount:ids.length},200,"Asset role updated");
+});
 app.get("/asset/ping", (_req,res)=>json(res,{message:"Asset module is reachable"}));
 // Any less frequently used asset action remains safely local and returns the shape expected by the client.
 app.use("/asset", (req,res,next)=>{ if(req.method === "GET") return json(res,[]); return json(res,{}); });

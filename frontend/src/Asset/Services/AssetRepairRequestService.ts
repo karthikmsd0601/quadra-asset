@@ -4,7 +4,7 @@ import { AssetFileRef } from "./AssetInventoryService";
 
 const API_BASE_URL = `${import.meta.env.VITE_API_BASE_URL}/asset/repair-requests`;
 
-export type RepairRequestStatus = "Pending" | "Approved" | "Rejected" | "Unrepairable" | "Re-Progress";
+export type RepairRequestStatus = "Pending" | "Approved" | "Rejected" | "Unrepairable" | "Re-Progress" | "Cancelled";
 export type RepairReprogressStatus = "Pending" | "Responded";
 
 export interface RepairAdminReprogressRecord {
@@ -27,6 +27,9 @@ export interface AssetRepairRequestRecord {
   AssetID: string;
   AssetName: string;
   AssetTagID: string;
+  AssetCategory?: string | null;
+  // The requestor has an open handover; approval waits until it is resolved.
+  HasPendingHandover?: boolean;
 
   IssueType: string;
   ProblemCategory: string;
@@ -125,12 +128,14 @@ export const adminActionOnRepairRequest = async (
   actedByUserId: string,
   actedByName?: string,
   actedByMail?: string,
-  reason?: string
+  reason?: string,
+  // Unrepairable only: in-stock asset assigned to the requestor in place of the retired one.
+  newAssetId?: string
 ): Promise<{ replacementRequestId: string; replacementRequestNumber: string } | undefined> => {
   try {
     const response = await axios.post<ApiResponse<{ replacementRequestId: string; replacementRequestNumber: string }>>(
       `${API_BASE_URL}/${id}/admin-action`,
-      { action, actedByUserId, actedByName, actedByMail, reason },
+      { action, actedByUserId, actedByName, actedByMail, reason, newAssetId },
       { headers: getAuthHeaders() }
     );
     return response.data.data;
@@ -194,5 +199,13 @@ export const uploadRepairRequestAttachments = async (id: string, files: File[]):
     return response.data.data ?? [];
   } catch (error) {
     return handleAxiosError(error, "Failed to upload attachments");
+  }
+};
+
+export const cancelAssetRepairRequest = async (requestId: string, actedByUserId: string, reason?: string): Promise<void> => {
+  try {
+    await axios.post(`${API_BASE_URL}/${requestId}/cancel`, { actedByUserId, reason }, { headers: getAuthHeaders() });
+  } catch (error) {
+    handleAxiosError(error, "Failed to cancel repair request");
   }
 };
